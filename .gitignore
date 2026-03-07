@@ -1,0 +1,6 @@
+node_modules/
+.env
+dashboard.log
+*.bak
+*.bak2
+config/dashboard-auth.json

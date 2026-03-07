@@ -1,0 +1,1607 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🤖 Clawdbot Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    :root {
+      --bg-primary: #0a0e17;
+      --bg-secondary: #0f1420;
+      --glass-bg: rgba(255, 255, 255, 0.03);
+      --glass-border: rgba(255, 255, 255, 0.08);
+      --glass-highlight: rgba(255, 255, 255, 0.12);
+      --text-primary: #f1f5f9;
+      --text-secondary: #94a3b8;
+      --text-muted: #64748b;
+      --accent-cyan: #06b6d4;
+      --accent-purple: #8b5cf6;
+      --accent-pink: #ec4899;
+      --accent-emerald: #10b981;
+      --accent-amber: #f59e0b;
+      --accent-rose: #f43f5e;
+      --accent-blue: #3b82f6;
+      --gradient-primary: linear-gradient(135deg, #06b6d4 0%, #8b5cf6 50%, #ec4899 100%);
+      --gradient-card: linear-gradient(135deg, rgba(6, 182, 212, 0.1) 0%, rgba(139, 92, 246, 0.05) 100%);
+      --shadow-glow: 0 0 40px rgba(6, 182, 212, 0.15);
+      --shadow-card: 0 8px 32px rgba(0, 0, 0, 0.3);
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      font-size: 14px;
+      line-height: 1.6;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* Animated Background */
+    body::before {
+      content: '';
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: 
+        radial-gradient(ellipse at 20% 20%, rgba(6, 182, 212, 0.08) 0%, transparent 50%),
+        radial-gradient(ellipse at 80% 80%, rgba(139, 92, 246, 0.08) 0%, transparent 50%),
+        radial-gradient(ellipse at 50% 50%, rgba(236, 72, 153, 0.03) 0%, transparent 50%);
+      pointer-events: none;
+      z-index: 0;
+      animation: backgroundPulse 15s ease-in-out infinite;
+    }
+
+    @keyframes backgroundPulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.8; transform: scale(1.05); }
+    }
+
+    /* Floating Orbs */
+    .orb {
+      position: fixed;
+      border-radius: 50%;
+      filter: blur(60px);
+      opacity: 0.4;
+      pointer-events: none;
+      z-index: 0;
+      animation: float 20s ease-in-out infinite;
+    }
+
+    .orb-1 {
+      width: 400px;
+      height: 400px;
+      background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple));
+      top: -100px;
+      left: -100px;
+      animation-delay: 0s;
+    }
+
+    .orb-2 {
+      width: 300px;
+      height: 300px;
+      background: linear-gradient(135deg, var(--accent-purple), var(--accent-pink));
+      bottom: -50px;
+      right: -50px;
+      animation-delay: -10s;
+    }
+
+    .orb-3 {
+      width: 200px;
+      height: 200px;
+      background: linear-gradient(135deg, var(--accent-emerald), var(--accent-cyan));
+      top: 50%;
+      right: 10%;
+      animation-delay: -5s;
+    }
+
+    @keyframes float {
+      0%, 100% { transform: translate(0, 0) rotate(0deg); }
+      25% { transform: translate(20px, -20px) rotate(5deg); }
+      50% { transform: translate(-10px, 20px) rotate(-5deg); }
+      75% { transform: translate(-20px, -10px) rotate(3deg); }
+    }
+
+    /* Header */
+    .header {
+      position: relative;
+      z-index: 10;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 24px 40px;
+      background: linear-gradient(180deg, rgba(10, 14, 23, 0.95) 0%, transparent 100%);
+      border-bottom: 1px solid var(--glass-border);
+    }
+
+    .header-left h1 {
+      font-size: 28px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      background: var(--gradient-primary);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .header-left h1::before {
+      content: '🤖';
+      -webkit-text-fill-color: initial;
+      font-size: 32px;
+      filter: drop-shadow(0 0 10px rgba(6, 182, 212, 0.5));
+      animation: iconPulse 2s ease-in-out infinite;
+    }
+
+    @keyframes iconPulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.05); }
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    .nav-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 16px;
+      color: var(--text-secondary);
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 500;
+      border-radius: 8px;
+      background: var(--glass-bg);
+      border: 1px solid var(--glass-border);
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .nav-link:hover {
+      color: var(--text-primary);
+      background: rgba(6, 182, 212, 0.1);
+      border-color: rgba(6, 182, 212, 0.3);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 20px rgba(6, 182, 212, 0.2);
+    }
+
+    .header-right {
+      text-align: right;
+    }
+
+    .status-indicator {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 16px;
+      background: var(--glass-bg);
+      border: 1px solid var(--glass-border);
+      border-radius: 12px;
+      font-size: 13px;
+      font-weight: 600;
+      min-width: 200px;
+      text-align: center;
+    }
+
+    .status-main {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      background: var(--accent-emerald);
+      border-radius: 50%;
+      box-shadow: 0 0 10px var(--accent-emerald), 0 0 20px var(--accent-emerald);
+      animation: statusPulse 2s ease-in-out infinite;
+    }
+
+    .status-dot.active {
+      background: var(--accent-emerald);
+      box-shadow: 0 0 10px var(--accent-emerald), 0 0 20px var(--accent-emerald);
+      animation: statusActivePulse 1s ease-in-out infinite;
+    }
+
+    .status-dot.idle {
+      background: var(--accent-amber);
+      box-shadow: 0 0 10px var(--accent-amber), 0 0 20px var(--accent-amber);
+      animation: statusIdlePulse 3s ease-in-out infinite;
+    }
+
+    .status-dot.processing {
+      background: var(--accent-cyan);
+      box-shadow: 0 0 10px var(--accent-cyan), 0 0 20px var(--accent-cyan);
+      animation: statusProcessingPulse 0.8s ease-in-out infinite;
+    }
+
+    .status-description {
+      font-size: 12px;
+      color: var(--text-secondary);
+      font-weight: 500;
+    }
+
+    .status-time {
+      font-size: 11px;
+      color: var(--text-muted);
+      font-family: 'SF Mono', 'Fira Code', monospace;
+    }
+
+    @keyframes statusActivePulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.7; transform: scale(1.1); }
+    }
+
+    @keyframes statusIdlePulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    @keyframes statusProcessingPulse {
+      0%, 100% { opacity: 1; transform: scale(1); box-shadow: 0 0 10px var(--accent-cyan), 0 0 20px var(--accent-cyan); }
+      50% { opacity: 0.8; transform: scale(1.2); box-shadow: 0 0 15px var(--accent-cyan), 0 0 30px var(--accent-cyan); }
+    }
+
+    @keyframes statusPulse {
+      0%, 100% { opacity: 1; box-shadow: 0 0 10px var(--accent-emerald), 0 0 20px var(--accent-emerald); }
+      50% { opacity: 0.6; box-shadow: 0 0 5px var(--accent-emerald), 0 0 10px var(--accent-emerald); }
+    }
+
+    #ocVersion {
+      background: var(--gradient-primary);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    #lastRefresh {
+      margin-top: 6px;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    /* Main Grid */
+    .grid {
+      position: relative;
+      z-index: 10;
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 24px;
+      padding: 24px 40px;
+      max-width: 1600px;
+      margin: 0 auto;
+    }
+
+    @media (max-width: 1200px) {
+      .grid {
+        grid-template-columns: 1fr;
+        padding: 16px;
+      }
+      .header {
+        padding: 16px;
+        flex-direction: column;
+        gap: 16px;
+        text-align: center;
+      }
+      .header-right {
+        text-align: center;
+      }
+    }
+
+    /* Glassmorphism Card */
+    .card {
+      position: relative;
+      background: var(--glass-bg);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid var(--glass-border);
+      border-radius: 20px;
+      padding: 24px;
+      transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+      overflow: hidden;
+    }
+
+    .card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--glass-highlight), transparent);
+    }
+
+    .card::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: var(--gradient-card);
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.4s ease;
+    }
+
+    .card:hover {
+      border-color: rgba(6, 182, 212, 0.3);
+      transform: translateY(-4px);
+      box-shadow: 
+        var(--shadow-card),
+        0 0 40px rgba(6, 182, 212, 0.1),
+        inset 0 0 60px rgba(6, 182, 212, 0.03);
+    }
+
+    .card:hover::after {
+      opacity: 1;
+    }
+
+    .card.full-width {
+      grid-column: 1 / -1;
+    }
+
+    .card-title {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin-bottom: 20px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--glass-border);
+      letter-spacing: -0.2px;
+    }
+
+    .card-title::before {
+      font-size: 20px;
+      filter: drop-shadow(0 0 8px currentColor);
+    }
+
+    /* Stat Rows */
+    .stat-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 16px;
+      margin: 8px 0;
+      background: rgba(255, 255, 255, 0.02);
+      border-radius: 12px;
+      border: 1px solid transparent;
+      transition: all 0.3s ease;
+    }
+
+    .stat-row:hover {
+      background: rgba(6, 182, 212, 0.05);
+      border-color: rgba(6, 182, 212, 0.1);
+    }
+
+    .stat-label {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-secondary);
+    }
+
+    .stat-value {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    /* Progress Bars */
+    .bar-container {
+      width: 120px;
+      height: 6px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.3);
+    }
+
+    .bar-fill {
+      height: 100%;
+      border-radius: 10px;
+      transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+      position: relative;
+    }
+
+    .bar-fill::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+      animation: shimmer 2s infinite;
+    }
+
+    @keyframes shimmer {
+      0% { transform: translateX(-100%); }
+      100% { transform: translateX(100%); }
+    }
+
+    .bar-green {
+      background: linear-gradient(90deg, var(--accent-emerald), #34d399);
+      box-shadow: 0 0 10px rgba(16, 185, 129, 0.5);
+    }
+
+    .bar-yellow {
+      background: linear-gradient(90deg, var(--accent-amber), #fbbf24);
+      box-shadow: 0 0 10px rgba(245, 158, 11, 0.5);
+    }
+
+    .bar-red {
+      background: linear-gradient(90deg, var(--accent-rose), #fb7185);
+      box-shadow: 0 0 10px rgba(244, 63, 94, 0.5);
+    }
+
+    /* Badges */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 4px 12px;
+      font-size: 11px;
+      font-weight: 600;
+      border-radius: 20px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      transition: all 0.3s ease;
+    }
+
+    .badge-ok {
+      background: rgba(16, 185, 129, 0.15);
+      color: var(--accent-emerald);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+
+    .badge-error {
+      background: rgba(244, 63, 94, 0.15);
+      color: var(--accent-rose);
+      border: 1px solid rgba(244, 63, 94, 0.3);
+    }
+
+    .badge-info {
+      background: rgba(6, 182, 212, 0.15);
+      color: var(--accent-cyan);
+      border: 1px solid rgba(6, 182, 212, 0.3);
+    }
+
+    /* Tools Grid */
+    .tool-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: 12px;
+    }
+
+    .tool-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 14px;
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid var(--glass-border);
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 500;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .tool-item:hover {
+      background: rgba(6, 182, 212, 0.08);
+      border-color: rgba(6, 182, 212, 0.3);
+      transform: scale(1.02);
+    }
+
+    .tool-item span:first-child {
+      color: var(--text-primary);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    /* Cron Items */
+    .cron-item {
+      padding: 16px;
+      margin: 8px 0;
+      background: linear-gradient(135deg, rgba(255, 255, 255, 0.02) 0%, rgba(139, 92, 246, 0.03) 100%);
+      border: 1px solid var(--glass-border);
+      border-radius: 12px;
+      transition: all 0.3s ease;
+    }
+
+    .cron-item:hover {
+      background: rgba(139, 92, 246, 0.05);
+      border-color: rgba(139, 92, 246, 0.2);
+      transform: translateX(4px);
+    }
+
+    .cron-name {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 8px;
+    }
+
+    .cron-detail {
+      font-size: 12px;
+      color: var(--text-secondary);
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* Sessions */
+    .session-item {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 14px 16px;
+      margin: 8px 0;
+      background: rgba(255, 255, 255, 0.02);
+      border-radius: 14px;
+      border: 1px solid transparent;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .session-item::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 3px;
+      border-radius: 3px;
+    }
+
+    .session-item:hover {
+      background: rgba(255, 255, 255, 0.04);
+      border-color: var(--glass-border);
+      transform: translateX(6px);
+    }
+
+    .session-icon {
+      width: 40px;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      background: var(--glass-bg);
+      border-radius: 10px;
+      flex-shrink: 0;
+    }
+
+    .session-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .session-task {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-primary);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .session-meta {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    .session-stats {
+      text-align: right;
+      flex-shrink: 0;
+    }
+
+    .session-model {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--accent-purple);
+    }
+
+    .session-time {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    .feed-item {
+      display: flex;
+      gap: 12px;
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--glass-border);
+      font-size: 13px;
+      animation: slideIn 0.3s ease-out;
+      align-items: center;
+    }
+
+    .feed-time { color: var(--text-muted); font-size: 11px; min-width: 60px; }
+    .feed-icon { font-size: 16px; }
+    .feed-desc { color: var(--text-primary); flex: 1; }
+    .feed-item.tool .feed-desc { color: var(--accent-cyan); }
+    .feed-item.user .feed-desc { color: var(--accent-purple); }
+    .feed-item.assistant .feed-desc { color: var(--accent-emerald); }
+    .feed-item.spawn .feed-desc { color: var(--accent-amber); }
+
+    /* Activity Notes */
+    .note-block {
+      padding: 20px;
+      margin-bottom: 16px;
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid var(--glass-border);
+      border-radius: 16px;
+      transition: all 0.3s ease;
+    }
+
+    .note-block:hover {
+      background: rgba(255, 255, 255, 0.03);
+      border-color: rgba(139, 92, 246, 0.2);
+    }
+
+    .note-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 700;
+      margin-bottom: 12px;
+      font-size: 14px;
+    }
+
+    .note-header.today {
+      color: var(--accent-purple);
+    }
+
+    .note-header.yesterday {
+      color: var(--text-muted);
+    }
+
+    .note-content {
+      font-size: 13px;
+      line-height: 1.8;
+      color: var(--text-secondary);
+    }
+
+    .note-content strong {
+      color: var(--text-primary);
+    }
+
+    .note-content h1 {
+      color: var(--accent-purple);
+      font-weight: 700;
+      font-size: 15px;
+      margin: 16px 0 8px;
+    }
+
+    .note-content h2 {
+      color: var(--accent-cyan);
+      font-weight: 700;
+      margin: 12px 0 6px;
+    }
+
+    .note-content ul {
+      padding-left: 20px;
+      margin: 4px 0;
+    }
+
+    .note-content li {
+      margin: 2px 0;
+    }
+
+    /* Refresh Note */
+    .refresh-note {
+      position: relative;
+      z-index: 10;
+      text-align: center;
+      padding: 24px;
+      color: var(--text-muted);
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    .refresh-note #countdown {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      background: var(--glass-bg);
+      border: 1px solid var(--glass-border);
+      border-radius: 8px;
+      font-weight: 700;
+      color: var(--accent-cyan);
+      margin: 0 2px;
+    }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 3px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(255, 255, 255, 0.2);
+    }
+
+    /* Animations */
+    @keyframes fadeInUp {
+      from {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .card {
+      animation: fadeInUp 0.6s cubic-bezier(0.4, 0, 0.2, 1) backwards;
+    }
+
+    .card:nth-child(1) { animation-delay: 0.1s; }
+    .card:nth-child(2) { animation-delay: 0.2s; }
+    .card:nth-child(3) { animation-delay: 0.3s; }
+    .card:nth-child(4) { animation-delay: 0.4s; }
+    .card:nth-child(5) { animation-delay: 0.5s; }
+    .card:nth-child(6) { animation-delay: 0.6s; }
+
+    /* Loading States */
+    .loading {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 40px;
+      color: var(--text-muted);
+    }
+
+    .loading::after {
+      content: '';
+      width: 20px;
+      height: 20px;
+      border: 2px solid var(--glass-border);
+      border-top-color: var(--accent-cyan);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin-left: 12px;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+  <!-- Floating Orbs -->
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+  <div class="orb orb-3"></div>
+
+  <!-- Header -->
+  <div class="header">
+    <div class="header-left">
+      <h1>Clawdbot Dashboard</h1>
+      <div class="nav-links">
+        <a href="/mail.html" class="nav-link">📧 Mail</a>
+        <a href="/agents.html" class="nav-link">🎛️ Agents</a>
+        <a href="/settings.html" class="nav-link">⚙️ Settings</a>
+        <a href="/neural.html" class="nav-link">🧠 Neural</a>
+        <a href="/logs.html" class="nav-link">📋 Logs</a>
+        <a href="/identity.html" class="nav-link">🧠 Identity</a>
+        <a href="/logout" class="nav-link" style="color: var(--accent-rose, #ef4444);">⏏ Logout</a>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="status-indicator" id="statusIndicator">
+        <div class="status-main">
+          <span class="status-dot" id="statusDot"></span>
+          <span id="statusText">Loading...</span>
+        </div>
+        <div class="status-description" id="statusDescription">Checking agent status...</div>
+        <div class="status-time" id="statusTime">OpenClaw v<span id="ocVersion">...</span></div>
+      </div>
+      <div id="lastRefresh">Loading...</div>
+    </div>
+  </div>
+
+  <!-- Budget Warning Banner -->
+  <div id="budgetBanner" style="display:none;margin:0 auto 16px;max-width:1400px;padding:12px 20px;border-radius:12px;font-size:13px;line-height:1.5;backdrop-filter:blur(20px)"></div>
+
+  <!-- Main Grid -->
+  <div class="grid">
+    <div class="card">
+      <div class="card-title">💻 System Health</div>
+      <div id="healthContent">
+        <div class="loading">Loading system metrics</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">🔧 Tools</div>
+      <div id="toolsContent">
+        <div class="loading">Loading tools</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">⏰ Scheduled Jobs</div>
+      <div id="cronContent">
+        <div class="loading">Loading cron jobs</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">🟢 Services</div>
+      <div id="servicesContent">
+        <div class="loading">Loading services</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">💰 Cost Tracker</div>
+      <div id="costContent">
+        <div class="loading">Loading costs</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">📊 Cost by Model (7d)</div>
+      <div id="costChartContent">
+        <div class="loading">Loading chart</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">📈 Session Activity</div>
+      <div id="sessionStatsContent">
+        <div class="loading">Loading session stats</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">🧠 Memory Health</div>
+      <div id="memoryHealthContent">
+        <div class="loading">Loading memory status</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">⚠️ Error Monitor</div>
+      <div id="errorMonitorContent">
+        <div class="loading">Loading error data</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">🔥 Token Burn (7d)</div>
+      <div id="tokenChartContent">
+        <div class="loading">Loading token data</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">🕐 Activity by Hour (7d)</div>
+      <div id="hourlyContent">
+        <div class="loading">Loading heatmap</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">📅 Sessions by Day (7d)</div>
+      <div id="dailySessionContent">
+        <div class="loading">Loading daily chart</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">📈 Resource History</div>
+      <div id="resourceHistoryContent">
+        <div class="loading">Loading history</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">🔀 Recent Commits</div>
+      <div id="gitFeedContent">
+        <div class="loading">Loading commits</div>
+      </div>
+    </div>
+
+    <div class="card full-width">
+      <div class="card-title">🌐 Provider Health</div>
+      <div id="providerHealthContent">
+        <div class="loading">Checking providers</div>
+      </div>
+    </div>
+
+    <div class="card full-width">
+      <div class="card-title">📋 Activity Feed</div>
+      <div id="activityFeedContent" style="max-height: 400px; overflow-y: auto;">
+        <div class="loading">Loading activity feed</div>
+      </div>
+    </div>
+
+    <div class="card full-width">
+      <div class="card-title">📋 Daily Notes</div>
+      <div id="activityContent" style="max-height: 450px; overflow-y: auto;">
+        <div class="loading">Loading notes</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="refresh-note">
+    Auto-refreshes every 15s • <span id="countdown">15</span>s
+  </div>
+
+  <script>
+    function formatBytes(b) {
+      if (b >= 1e9) return (b / 1e9).toFixed(1) + ' GB';
+      if (b >= 1e6) return (b / 1e6).toFixed(0) + ' MB';
+      return (b / 1e3).toFixed(0) + ' KB';
+    }
+
+    function formatUptime(s) {
+      var d = Math.floor(s / 86400),
+        h = Math.floor(s % 86400 / 3600),
+        m = Math.floor(s % 3600 / 60);
+      return d > 0 ? d + 'd ' + h + 'h ' + m + 'm' : h > 0 ? h + 'h ' + m + 'm' : m + 'm';
+    }
+
+    function barColor(p) {
+      var n = parseFloat(p);
+      return n >= 80 ? 'bar-red' : n >= 60 ? 'bar-yellow' : 'bar-green';
+    }
+
+    function escapeHtml(s) {
+      return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    // ── Retry-aware fetch: credentials + 10s timeout + 2 auto-retries ────
+    function safeFetch(url, retries, delayMs) {
+      retries = (retries === undefined) ? 2 : retries;
+      delayMs = (delayMs === undefined) ? 2000 : delayMs;
+      return new Promise(function(resolve) {
+        var attempt = function(left) {
+          var ctrl = new AbortController();
+          var timer = setTimeout(function() { ctrl.abort(); }, 10000);
+          fetch(url, { credentials: 'same-origin', signal: ctrl.signal })
+            .then(function(r) {
+              clearTimeout(timer);
+              return r.ok ? r.json() : Promise.resolve(null);
+            })
+            .then(resolve)
+            .catch(function() {
+              clearTimeout(timer);
+              if (left > 0) { setTimeout(function() { attempt(left - 1); }, delayMs); }
+              else { resolve(null); }
+            });
+        };
+        attempt(retries);
+      });
+    }
+
+    function cardErr(id) {
+      var el = document.getElementById(id);
+      if (!el) return;
+      el.innerHTML = '<div style="color:var(--accent-rose,#f43f5e);padding:16px;text-align:center;font-size:13px;">⚠️ Failed to load<br><button onclick="fetchAll()" style="margin-top:8px;padding:4px 14px;background:rgba(244,63,94,0.15);border:1px solid rgba(244,63,94,0.3);color:var(--accent-rose,#f43f5e);border-radius:6px;cursor:pointer;font-size:12px;">↻ Retry</button></div>';
+    }
+
+    function fetchAll() {
+      // ── Health / System ────────────────────────────────────────────────
+      safeFetch('/api/health').then(function(health) {
+        if (!health) { cardErr('healthContent'); return; }
+        document.getElementById('ocVersion').textContent = (health.openclaw && health.openclaw.version) || '?';
+        document.getElementById('lastRefresh').textContent = 'Last updated: ' + new Date().toLocaleTimeString();
+        var memPct = health.system.memory.pct || '0';
+        var diskPct = parseFloat(health.system.disk.pct) || 0;
+        document.getElementById('healthContent').innerHTML =
+          '<div class="stat-row"><span class="stat-label">Hostname</span><span class="stat-value">' + health.system.hostname + '</span></div>' +
+          '<div class="stat-row"><span class="stat-label">Uptime</span><span class="stat-value">' + formatUptime(health.system.uptime) + '</span></div>' +
+          '<div class="stat-row"><span class="stat-label">CPU</span><span class="stat-value">' + health.system.cpu.count + ' cores • Load: ' + health.system.cpu.load[0].toFixed(2) + '</span></div>' +
+          '<div class="stat-row"><span class="stat-label">Memory</span><span class="stat-value"><span class="bar-container"><span class="bar-fill ' + barColor(memPct) + '" style="width:' + memPct + '%"></span></span>' + memPct + '%</span></div>' +
+          '<div class="stat-row"><span class="stat-label">Disk</span><span class="stat-value"><span class="bar-container"><span class="bar-fill ' + barColor(diskPct) + '" style="width:' + (diskPct || 0) + '%"></span></span>' + (health.system.disk.pct || 'N/A') + '</span></div>' +
+          '<div class="stat-row"><span class="stat-label">OpenClaw</span><span class="stat-value">PID ' + ((health.openclaw && health.openclaw.pid) || '?') + '</span></div>';
+      });
+
+      // ── Tools ─────────────────────────────────────────────────────────
+      safeFetch('/api/tools').then(function(tools) {
+        if (!tools) { cardErr('toolsContent'); return; }
+        if (tools.tools) {
+          document.getElementById('toolsContent').innerHTML =
+            '<div class="tool-grid">' + tools.tools.map(function(t) {
+              return '<div class="tool-item"><span>' + t.name + '</span><span class="badge ' + (t.status === 'ok' || t.status === 'configured' ? 'badge-ok' : 'badge-error') + '">' + t.status + '</span></div>';
+            }).join('') + '</div>';
+        } else {
+          document.getElementById('toolsContent').innerHTML = '<div style="color:var(--text-muted);text-align:center;padding:20px;">Tools data unavailable</div>';
+        }
+      });
+
+      // ── Cron Jobs ─────────────────────────────────────────────────────
+      safeFetch('/api/crons').then(function(crons) {
+        if (!crons) { cardErr('cronContent'); return; }
+        if (crons.jobs && crons.jobs.length) {
+          document.getElementById('cronContent').innerHTML = crons.jobs.map(function(j) {
+            var next = j.state && j.state.nextRunAtMs ? new Date(j.state.nextRunAtMs).toLocaleString() : '?';
+            var last = j.state ? j.state.lastStatus || 'never' : 'never';
+            var sched = (j.schedule && (j.schedule.expr || j.schedule.kind)) || '?';
+            return '<div class="cron-item"><div class="cron-name">' + (j.name || j.id) + '</div><div class="cron-detail">' + sched + ' • <span class="badge ' + (last === 'ok' ? 'badge-ok' : 'badge-info') + '">' + last + '</span> • Next: ' + next + '</div></div>';
+          }).join('');
+        } else {
+          document.getElementById('cronContent').innerHTML = '<div class="stat-row" style="color: var(--text-muted); justify-content: center;">No scheduled jobs configured</div>';
+        }
+      });
+
+      // ── Services + Daily Notes ─────────────────────────────────────────
+      safeFetch('/api/activity').then(function(activity) {
+        if (!activity) { cardErr('servicesContent'); cardErr('activityContent'); return; }
+        if (activity.services) {
+          document.getElementById('servicesContent').innerHTML = Object.entries(activity.services).map(function(entry) {
+            var n = entry[0], i = entry[1];
+            return '<div class="stat-row"><span class="stat-label">' + n + '</span><span class="badge ' + (i.status === 'active' ? 'badge-ok' : 'badge-error') + '">' + i.status + '</span></div>';
+          }).join('');
+        } else {
+          document.getElementById('servicesContent').innerHTML = '<div style="color:var(--text-muted);text-align:center;padding:20px;">Service data unavailable</div>';
+        }
+        function renderMd(t) {
+          if (!t) return '';
+          return escapeHtml(t)
+            .replace(/^## (.+)$/gm, '<h2>$1</h2>')
+            .replace(/^# (.+)$/gm, '<h1>$1</h1>')
+            .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+            .replace(/^- (.+)$/gm, '<li>$1</li>')
+            .replace(/(<li>.*<\/li>(\n<li>.*<\/li>)*)/gs, '<ul>$1</ul>')
+            .replace(/\n\n/g, '<br><br>')
+            .replace(/\n/g, '<br>');
+        }
+        var ah = '';
+        if (activity.today && activity.today.log) {
+          ah += '<div class="note-block"><div class="note-header today">📅 Today — ' + activity.today.date + '</div><div class="note-content">' + renderMd(activity.today.log) + '</div></div>';
+        }
+        if (activity.yesterday && activity.yesterday.log) {
+          ah += '<div class="note-block"><div class="note-header yesterday">📅 Yesterday — ' + activity.yesterday.date + '</div><div class="note-content">' + renderMd(activity.yesterday.log) + '</div></div>';
+        }
+        document.getElementById('activityContent').innerHTML = ah || '<div class="stat-row" style="color: var(--text-muted); justify-content: center;">No notes available</div>';
+
+        // ── Git Commits Feed ──────────────────────────────────────────
+        var gitEl = document.getElementById('gitFeedContent');
+        if (gitEl) {
+          var gitLog = activity.gitLog || '';
+          if (gitLog && gitLog.trim()) {
+            var commits = gitLog.trim().split('\n').filter(Boolean).slice(0, 10);
+            var gitHtml = commits.map(function(line) {
+              var hash = line.substring(0, 7);
+              var msg = escapeHtml(line.substring(8).trim());
+              // Detect commit type from message prefix
+              var icon = '📝';
+              var msgLower = msg.toLowerCase();
+              if (msgLower.indexOf('fix') === 0 || msgLower.indexOf('bug') !== -1) icon = '🐛';
+              else if (msgLower.indexOf('add') === 0 || msgLower.indexOf('feat') === 0) icon = '✨';
+              else if (msgLower.indexOf('update') === 0 || msgLower.indexOf('updat') === 0) icon = '🔄';
+              else if (msgLower.indexOf('remove') === 0 || msgLower.indexOf('delet') === 0) icon = '🗑️';
+              else if (msgLower.indexOf('refactor') === 0) icon = '♻️';
+              else if (msgLower.indexOf('memory') !== -1 || msgLower.indexOf('mem') !== -1) icon = '🧠';
+              else if (msgLower.indexOf('dashboard') !== -1) icon = '📊';
+              else if (msgLower.indexOf('cron') !== -1) icon = '⏰';
+              return '<div class="stat-row" style="align-items:flex-start;gap:10px;padding:10px 14px;">' +
+                '<span style="font-size:15px;flex-shrink:0;margin-top:1px">' + icon + '</span>' +
+                '<div style="flex:1;min-width:0">' +
+                  '<div style="font-size:13px;color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + msg + '">' + msg + '</div>' +
+                  '<div style="font-size:11px;color:var(--text-muted);margin-top:2px;font-family:\'SF Mono\',\'Fira Code\',monospace">' + hash + '</div>' +
+                '</div>' +
+              '</div>';
+            }).join('');
+            gitEl.innerHTML = gitHtml;
+          } else {
+            gitEl.innerHTML = '<div style="color:var(--text-muted);text-align:center;padding:20px;font-size:13px;">No commits in the last 2 days</div>';
+          }
+        }
+      });
+
+      // ── Activity Feed ─────────────────────────────────────────────────
+      safeFetch('/api/activity/feed?limit=80').then(function(activityFeed) {
+        if (!activityFeed) { cardErr('activityFeedContent'); return; }
+        if (activityFeed.items && activityFeed.items.length) {
+          var rel = function(ts) {
+            var d = Date.now() - new Date(ts).getTime();
+            var m = Math.floor(d / 60000);
+            if (m < 1) return 'now';
+            if (m < 60) return m + 'm ago';
+            var h = Math.floor(m / 60);
+            if (h < 24) return h + 'h ago';
+            return Math.floor(h / 24) + 'd ago';
+          };
+          document.getElementById('activityFeedContent').innerHTML = activityFeed.items.map(function(it) {
+            var cls = it.type || 'tool';
+            if ((it.description || '').indexOf('🚀 Spawned') === 0) cls += ' spawn';
+            return '<div class="feed-item ' + cls + '">' +
+              '<div class="feed-time">' + rel(it.timestamp) + '</div>' +
+              '<div class="feed-icon">' + (it.icon || '📋') + '</div>' +
+              '<div class="feed-desc" title="' + escapeHtml(it.detail || '') + '">' + escapeHtml(it.description || '') + '</div>' +
+              '</div>';
+          }).join('');
+        } else {
+          document.getElementById('activityFeedContent').innerHTML = '<div class="stat-row" style="color: var(--text-muted); justify-content: center;">No recent actions</div>';
+        }
+      });
+
+      // ── Live Status Badge (independent) ───────────────────────────────
+      safeFetch('/api/status/heartbeat').then(function(liveStatus) {
+        if (liveStatus) updateStatusIndicator(liveStatus);
+      });
+
+      // ── Cost Summary ──────────────────────────────────────────────────
+      safeFetch('/api/costs/summary').then(function(costSummary) {
+        if (!costSummary) { cardErr('costContent'); return; }
+        var todayCost = (costSummary.totalToday || 0).toFixed(4);
+        var weekCost = (costSummary.totalSevenDays || 0).toFixed(4);
+        var subHtml = '';
+        if (costSummary.subscriptionUsage) {
+          for (var sm in costSummary.subscriptionUsage) {
+            var su = costSummary.subscriptionUsage[sm];
+            subHtml += '<div class="stat-row"><span class="stat-label">' + sm.split('/').pop() + ' (sub)</span><span class="stat-value" style="color:var(--accent-purple)">' + ((su.input+su.output)/1000).toFixed(1) + 'K tokens • ' + su.calls + ' calls</span></div>';
+          }
+        }
+        var dailyHtml = '<div style="display:flex;gap:4px;align-items:flex-end;height:60px;margin-top:12px">';
+        var maxDay = Math.max.apply(null, costSummary.sevenDayBreakdown.map(function(d){return d.cost;})) || 1;
+        costSummary.sevenDayBreakdown.forEach(function(d) {
+          var pct = Math.max(d.cost / maxDay * 100, 2);
+          var day = d.date.slice(5);
+          dailyHtml += '<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px"><div style="width:100%;background:linear-gradient(180deg,var(--accent-cyan),var(--accent-purple));border-radius:4px 4px 0 0;height:' + pct + '%" title="$' + d.cost.toFixed(4) + '"></div><span style="font-size:9px;color:var(--text-secondary)">' + day + '</span></div>';
+        });
+        dailyHtml += '</div>';
+        document.getElementById('costContent').innerHTML =
+          '<div class="stat-row"><span class="stat-label">Today</span><span class="stat-value" style="color:var(--accent-emerald)">$' + todayCost + '</span></div>' +
+          '<div class="stat-row"><span class="stat-label">7-Day Total</span><span class="stat-value" style="color:var(--accent-cyan)">$' + weekCost + '</span></div>' +
+          subHtml + dailyHtml;
+        // Budget warning banner
+        if (costSummary.budget && costSummary.budget.alertEnabled) {
+          var bp = costSummary.budget;
+          var banner = document.getElementById('budgetBanner');
+          if (banner) {
+            if (bp.overBudget) {
+              banner.style.display = 'block';
+              banner.style.background = 'rgba(239, 68, 68, 0.1)';
+              banner.style.border = '1px solid rgba(239, 68, 68, 0.3)';
+              banner.innerHTML = '🚨 <strong style="color:#ef4444">Over Budget!</strong> Daily: $' + (costSummary.totalToday||0).toFixed(4) + ' / $' + bp.dailyLimit.toFixed(2) + ' (' + bp.dailyPercentUsed + '%) · Weekly: $' + (costSummary.totalSevenDays||0).toFixed(4) + ' / $' + bp.weeklyLimit.toFixed(2) + ' (' + bp.weeklyPercentUsed + '%)';
+            } else if (bp.dailyPercentUsed >= 80 || bp.weeklyPercentUsed >= 80) {
+              banner.style.display = 'block';
+              banner.style.background = 'rgba(245, 158, 11, 0.1)';
+              banner.style.border = '1px solid rgba(245, 158, 11, 0.3)';
+              banner.innerHTML = '⚠️ <strong style="color:#f59e0b">Approaching Budget Limit</strong> Daily: $' + (costSummary.totalToday||0).toFixed(4) + ' / $' + bp.dailyLimit.toFixed(2) + ' (' + bp.dailyPercentUsed + '%) · Weekly: $' + (costSummary.totalSevenDays||0).toFixed(4) + ' / $' + bp.weeklyLimit.toFixed(2) + ' (' + bp.weeklyPercentUsed + '%)';
+            } else {
+              banner.style.display = 'none';
+            }
+          }
+        }
+      });
+
+      // ── Cost by Model + Token Burn charts ─────────────────────────────
+      safeFetch('/api/costs/by-model').then(function(costByModel) {
+        if (!costByModel) { cardErr('costChartContent'); cardErr('tokenChartContent'); return; }
+        if (costByModel.models) {
+          var models = costByModel.models;
+          var maxCost = models.length ? models[0].cost : 1;
+          if (maxCost === 0) maxCost = 1;
+          var chartHtml = models.map(function(m) {
+            var pct = Math.max(m.cost / maxCost * 100, m.cost > 0 ? 5 : 0);
+            var shortName = m.model.split('/').pop();
+            var color = m.subscription ? 'var(--accent-purple)' : m.cost === 0 ? 'var(--text-muted)' : 'var(--accent-cyan)';
+            return '<div style="margin-bottom:8px"><div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:2px"><span style="color:var(--text-secondary)">' + escapeHtml(shortName) + '</span><span style="color:' + color + '">' + (m.subscription ? 'sub' : '$' + m.cost.toFixed(4)) + '</span></div><div style="height:8px;background:rgba(255,255,255,0.05);border-radius:4px;overflow:hidden"><div style="height:100%;width:' + pct + '%;background:' + color + ';border-radius:4px;transition:width 0.5s"></div></div><div style="font-size:9px;color:var(--text-secondary);margin-top:1px">' + m.calls + ' calls • ' + ((m.input+m.output)/1000).toFixed(0) + 'K tokens</div></div>';
+          }).join('');
+          document.getElementById('costChartContent').innerHTML = chartHtml || '<div style="color:var(--text-secondary);text-align:center;padding:20px">No cost data yet</div>';
+
+          // Token Burn by Model — sorted by volume
+          var fmtKm = function(n) { if (n===null||n===undefined) return '—'; if (n>=1000000) return (n/1000000).toFixed(1)+'M'; if (n>=1000) return (n/1000).toFixed(1)+'K'; return String(n); };
+          var tokenModels = models.filter(function(m) { return (m.input||0)+(m.output||0)>0; })
+            .slice().sort(function(a,b){ return ((b.input||0)+(b.output||0))-((a.input||0)+(a.output||0)); }).slice(0,6);
+          var maxTok = tokenModels.length ? (tokenModels[0].input||0)+(tokenModels[0].output||0) : 1;
+          if (maxTok===0) maxTok=1;
+          var tokHtml = tokenModels.map(function(m) {
+            var total=(m.input||0)+(m.output||0), pct=Math.max(total/maxTok*100,4);
+            var shortName=m.model.split('/').pop(), color=m.subscription?'var(--accent-purple)':'var(--accent-emerald)';
+            return '<div style="margin-bottom:9px"><div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:2px"><span style="color:var(--text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:55%">'+escapeHtml(shortName)+'</span><span style="color:'+color+'">'+(total>=1000?(total/1000).toFixed(0)+'K':total)+' tok</span></div><div style="height:6px;background:rgba(255,255,255,0.05);border-radius:3px;overflow:hidden"><div style="height:100%;width:'+pct+'%;background:'+color+';border-radius:3px;transition:width 0.5s"></div></div><div style="font-size:9px;color:var(--text-muted);margin-top:2px">↓'+fmtKm(m.input)+' in · ↑'+fmtKm(m.output)+' out · '+m.calls+' calls</div></div>';
+          }).join('');
+          document.getElementById('tokenChartContent').innerHTML = tokHtml || '<div style="color:var(--text-secondary);text-align:center;padding:20px">No token data yet</div>';
+        }
+      });
+
+      // ── Session Stats ─────────────────────────────────────────────────
+      safeFetch('/api/stats/today').then(function(sessionStats) {
+        if (!sessionStats) { cardErr('sessionStatsContent'); return; }
+        var fmtK = function(n) { if (n===null||n===undefined) return '—'; if (n>=1000000) return (n/1000000).toFixed(1)+'M'; if (n>=1000) return (n/1000).toFixed(1)+'K'; return String(n); };
+        if (!sessionStats.error) {
+          var ss = sessionStats;
+          var errColor = (ss.errorsToday > 0) ? 'var(--accent-rose,#f43f5e)' : 'var(--accent-emerald)';
+          var errPct = (ss.sessionsToday > 0 && ss.errorsToday !== null) ? ' (' + Math.round(ss.errorsToday / ss.sessionsToday * 100) + '%)' : '';
+          var activeTag = (ss.activeSessions > 0) ? ' <span style="color:var(--accent-emerald);font-size:11px;font-weight:600">● ' + ss.activeSessions + ' live</span>' : '';
+          document.getElementById('sessionStatsContent').innerHTML =
+            '<div class="stat-row"><span class="stat-label">Today</span><span class="stat-value" style="color:var(--accent-cyan)">' + ss.sessionsToday + ' sessions' + activeTag + '</span></div>' +
+            '<div class="stat-row"><span class="stat-label">This Week</span><span class="stat-value" style="color:var(--text-secondary)">' + ss.sessionsWeek + ' sessions</span></div>' +
+            '<div class="stat-row"><span class="stat-label">Tokens In</span><span class="stat-value" style="color:var(--accent-purple)">↓ ' + fmtK(ss.tokensInToday) + '</span></div>' +
+            '<div class="stat-row"><span class="stat-label">Tokens Out</span><span class="stat-value" style="color:var(--accent-amber)">↑ ' + fmtK(ss.tokensOutToday) + '</span></div>' +
+            '<div class="stat-row"><span class="stat-label">Errors</span><span class="stat-value" style="color:' + errColor + '">' + (ss.errorsToday !== null ? ss.errorsToday + errPct : '—') + '</span></div>' +
+            '<div class="stat-row"><span class="stat-label">Tool Calls</span><span class="stat-value">' + fmtK(ss.toolCallsToday) + '</span></div>';
+        } else {
+          document.getElementById('sessionStatsContent').innerHTML = '<div style="color:var(--text-muted);text-align:center;padding:20px;">No session data yet</div>';
+        }
+      });
+
+      // ── Memory Health ─────────────────────────────────────────────────
+      safeFetch('/api/memory/health').then(function(mh) {
+        if (!mh) { cardErr('memoryHealthContent'); return; }
+        function fmtAge(ageMs) {
+          if (ageMs === null || ageMs === undefined) return 'unknown';
+          var m = Math.floor(ageMs / 60000);
+          if (m < 1) return 'just now';
+          if (m < 60) return m + 'm ago';
+          var h = Math.floor(m / 60);
+          if (h < 24) return h + 'h ago';
+          return Math.floor(h / 24) + 'd ago';
+        }
+        function fmtSize(b) {
+          if (!b) return '—';
+          if (b >= 1024) return (b / 1024).toFixed(1) + ' KB';
+          return b + ' B';
+        }
+        var files = [
+          { key: 'memoryMd',       label: 'MEMORY.md',         icon: '📚' },
+          { key: 'todayLog',       label: "Today's Log",        icon: '📅' },
+          { key: 'sessionState',   label: 'Session State',      icon: '💾' },
+          { key: 'heartbeatState', label: 'Heartbeat State',    icon: '💓' },
+          { key: 'heartbeatMd',    label: 'HEARTBEAT.md',       icon: '⏰' }
+        ];
+        var html = '';
+        files.forEach(function(f) {
+          var d = mh[f.key] || {};
+          if (!d.exists) {
+            html += '<div class="stat-row"><span class="stat-label">' + f.icon + ' ' + f.label + '</span>' +
+              '<span class="stat-value" style="color:var(--text-muted)">missing</span></div>';
+            return;
+          }
+          var ageStr = fmtAge(d.ageMs);
+          var sizeStr = fmtSize(d.size);
+          var lineStr = d.lines > 0 ? ' · ' + d.lines + ' lines' : '';
+          var freshColor = d.stale ? 'var(--accent-amber)' : 'var(--accent-emerald)';
+          var freshIcon = d.stale ? '⚠️' : '✅';
+          html += '<div class="stat-row">' +
+            '<span class="stat-label">' + f.icon + ' ' + f.label + '</span>' +
+            '<span class="stat-value" style="gap:8px">' +
+              '<span style="color:var(--text-muted);font-size:11px">' + sizeStr + lineStr + '</span>' +
+              '<span style="color:var(--text-secondary);font-size:11px">' + ageStr + '</span>' +
+              '<span title="' + (d.stale ? 'Stale' : 'Fresh') + '">' + freshIcon + '</span>' +
+            '</span>' +
+          '</div>';
+        });
+        document.getElementById('memoryHealthContent').innerHTML = html ||
+          '<div style="color:var(--text-muted);text-align:center;padding:20px">No data</div>';
+      });
+
+      // ── Error Monitor ─────────────────────────────────────────────────
+      safeFetch('/api/sessions/errors-summary').then(function(errData) {
+        if (!errData) { cardErr('errorMonitorContent'); return; }
+        var errCount = errData.errorsToday || 0;
+        var total = errData.totalToday || 0;
+        var rate = errData.successRate !== undefined ? errData.successRate : 100;
+        var rateColor = rate >= 95 ? 'var(--accent-emerald)' : rate >= 80 ? 'var(--accent-amber)' : 'var(--accent-rose)';
+        var errColor = errCount === 0 ? 'var(--accent-emerald)' : errCount < 3 ? 'var(--accent-amber)' : 'var(--accent-rose)';
+        // Progress ring (CSS trick via conic-gradient)
+        var ringHtml = '<div style="display:flex;align-items:center;gap:20px;margin-bottom:16px">' +
+          '<div style="position:relative;width:72px;height:72px;flex-shrink:0">' +
+            '<div style="width:72px;height:72px;border-radius:50%;background:conic-gradient(' + rateColor + ' ' + rate + '%, rgba(255,255,255,0.06) 0%);display:flex;align-items:center;justify-content:center;box-shadow:0 0 16px ' + rateColor + '44">' +
+              '<div style="width:52px;height:52px;border-radius:50%;background:var(--bg-primary);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:' + rateColor + '">' + rate + '%</div>' +
+            '</div>' +
+          '</div>' +
+          '<div>' +
+            '<div style="font-size:22px;font-weight:700;color:' + errColor + '">' + errCount + ' error' + (errCount !== 1 ? 's' : '') + '</div>' +
+            '<div style="font-size:12px;color:var(--text-secondary);margin-top:2px">' + total + ' sessions today</div>' +
+            '<div style="font-size:12px;color:' + rateColor + ';font-weight:600;margin-top:2px">' + rate + '% success rate</div>' +
+          '</div>' +
+        '</div>';
+        var errListHtml = '';
+        if (errData.recentErrors && errData.recentErrors.length) {
+          errListHtml = '<div style="border-top:1px solid var(--glass-border);padding-top:12px;margin-top:4px">' +
+            '<div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);margin-bottom:8px">Recent Failures</div>' +
+            errData.recentErrors.map(function(e) {
+              var when = '';
+              if (e.time) { var d=Date.now()-new Date(e.time).getTime(); var m=Math.floor(d/60000); when=m<60?m+'m ago':Math.floor(m/60)+'h ago'; }
+              var kindIcon = e.kind==='cron'?'⏰':e.kind==='subagent'?'🤖':'💬';
+              var statusBadge = e.status==='aborted'?'<span style="color:var(--accent-amber);font-size:10px">aborted</span>':'<span style="color:var(--accent-rose);font-size:10px">failed</span>';
+              return '<div style="padding:8px 10px;margin-bottom:6px;background:rgba(244,63,94,0.05);border:1px solid rgba(244,63,94,0.15);border-radius:8px;font-size:12px">' +
+                '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">' +
+                  '<span style="color:var(--text-primary);font-weight:500">' + kindIcon + ' ' + escapeHtml((e.task||e.id||'unknown').substring(0,50)) + '</span>' +
+                  '<span style="display:flex;align-items:center;gap:6px">' + statusBadge + '<span style="color:var(--text-muted);font-size:10px">' + when + '</span></span>' +
+                '</div>' +
+                (e.error ? '<div style="color:var(--text-muted);font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + escapeHtml(e.error) + '</div>' : '') +
+              '</div>';
+            }).join('') +
+          '</div>';
+        } else if (errCount === 0) {
+          errListHtml = '<div style="text-align:center;padding:12px;color:var(--accent-emerald);font-size:13px;font-weight:500">✅ No errors today — all clear!</div>';
+        }
+        document.getElementById('errorMonitorContent').innerHTML = ringHtml + errListHtml;
+      });
+
+      // ── Provider Health ───────────────────────────────────────────────
+      safeFetch('/api/health/providers').then(function(providers) {
+        if (!providers) { cardErr('providerHealthContent'); return; }
+        var providerMap = {
+          anthropic:    { label: 'Anthropic',    icon: '🟣' },
+          openrouter:   { label: 'OpenRouter',   icon: '🌐' },
+          ollama:       { label: 'Ollama (local)', icon: '🦙' },
+          'openai-codex': { label: 'OpenAI',     icon: '🔵' }
+        };
+        var html = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;">';
+        var checkedAt = providers.checkedAt ? new Date(providers.checkedAt).toLocaleTimeString() : '?';
+        for (var key in providerMap) {
+          var p = providerMap[key];
+          var d = providers[key] || { status: 'unknown', latencyMs: null };
+          var isOk = d.status === 'ok';
+          var dotColor = isOk ? 'var(--accent-emerald)' : d.status === 'unknown' ? 'var(--text-muted)' : 'var(--accent-rose)';
+          var latency = d.latencyMs != null ? d.latencyMs + 'ms' : '—';
+          var latencyColor = d.latencyMs == null ? 'var(--text-muted)' : d.latencyMs < 500 ? 'var(--accent-emerald)' : d.latencyMs < 2000 ? 'var(--accent-amber)' : 'var(--accent-rose)';
+          var extra = '';
+          if (key === 'ollama' && d.models != null) extra = ' • ' + d.models + ' model' + (d.models === 1 ? '' : 's');
+          if (key === 'openrouter' && d.balance && typeof d.balance.usage !== 'undefined') {
+            extra = ' • $' + Number(d.balance.usage).toFixed(2) + ' used';
+          }
+          html += '<div style="display:flex;align-items:center;gap:12px;padding:12px 16px;background:rgba(255,255,255,0.02);border:1px solid var(--glass-border);border-radius:12px;transition:all 0.3s ease;" ' +
+            'onmouseover="this.style.borderColor=\'rgba(6,182,212,0.3)\';this.style.background=\'rgba(6,182,212,0.05)\'" ' +
+            'onmouseout="this.style.borderColor=\'var(--glass-border)\';this.style.background=\'rgba(255,255,255,0.02)\'">' +
+            '<span style="font-size:20px">' + p.icon + '</span>' +
+            '<div style="flex:1;min-width:0">' +
+              '<div style="font-size:13px;font-weight:600;color:var(--text-primary)">' + p.label + '</div>' +
+              '<div style="font-size:11px;color:var(--text-muted);margin-top:2px">' +
+                '<span style="color:' + dotColor + '">●</span> ' + (isOk ? 'Online' : d.status === 'unknown' ? 'Unknown' : 'Offline') + extra +
+              '</div>' +
+            '</div>' +
+            '<div style="text-align:right;flex-shrink:0">' +
+              '<div style="font-size:13px;font-weight:700;color:' + latencyColor + '">' + latency + '</div>' +
+              '<div style="font-size:10px;color:var(--text-muted)">latency</div>' +
+            '</div>' +
+          '</div>';
+        }
+        html += '</div>';
+        html += '<div style="margin-top:10px;font-size:11px;color:var(--text-muted);text-align:right">Checked at ' + checkedAt + ' · updates every 60s</div>';
+        document.getElementById('providerHealthContent').innerHTML = html;
+      });
+
+      // ── System Resource History sparklines ───────────────────────────
+      safeFetch('/api/metrics/history').then(function(metrics) {
+        if (!metrics) { cardErr('resourceHistoryContent'); return; }
+        var history = metrics.history || [];
+        if (history.length < 2) {
+          document.getElementById('resourceHistoryContent').innerHTML =
+            '<div style="color:var(--text-muted);text-align:center;padding:20px;font-size:13px;">Collecting data — check back in a minute ⏳<br><small style="font-size:11px;opacity:0.6">Samples appear on each dashboard refresh</small></div>';
+          return;
+        }
+        // ── Draw a small SVG sparkline ──────────────────────────────
+        function sparkline(data, color, label, unit, decimals) {
+          var n = data.length;
+          var min = Math.min.apply(null, data);
+          var max = Math.max.apply(null, data);
+          var range = max - min || 1;
+          var W = 260, H = 52, PL = 2, PR = 2, PT = 4, PB = 4;
+          var iW = W - PL - PR, iH = H - PT - PB;
+          var pts = data.map(function(v, i) {
+            var x = PL + (i / (n - 1)) * iW;
+            var y = PT + iH - ((v - min) / range) * iH;
+            return x.toFixed(1) + ',' + y.toFixed(1);
+          }).join(' ');
+          var last = data[data.length - 1];
+          var lastY = (PT + iH - ((last - min) / range) * iH).toFixed(1);
+          var dotX = (PL + iW).toFixed(1);
+          var latestVal = last.toFixed(decimals || 1) + unit;
+          var minVal = min.toFixed(decimals || 1) + unit;
+          var maxVal = max.toFixed(decimals || 1) + unit;
+          return '<div style="margin-bottom:16px">' +
+            '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">' +
+              '<span style="font-size:12px;font-weight:600;color:var(--text-secondary)">' + label + '</span>' +
+              '<span style="font-size:14px;font-weight:700;color:' + color + '">' + latestVal + '</span>' +
+            '</div>' +
+            '<svg width="100%" viewBox="0 0 ' + W + ' ' + H + '" style="display:block;overflow:visible">' +
+              '<defs>' +
+                '<linearGradient id="grad_' + label.replace(/\s/g,'_') + '" x1="0" y1="0" x2="0" y2="1">' +
+                  '<stop offset="0%" stop-color="' + color + '" stop-opacity="0.3"/>' +
+                  '<stop offset="100%" stop-color="' + color + '" stop-opacity="0.03"/>' +
+                '</linearGradient>' +
+              '</defs>' +
+              '<polygon points="' + PL + ',' + (PT + iH) + ' ' + pts + ' ' + (PL + iW) + ',' + (PT + iH) + '" fill="url(#grad_' + label.replace(/\s/g,'_') + ')"/>' +
+              '<polyline points="' + pts + '" fill="none" stroke="' + color + '" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>' +
+              '<circle cx="' + dotX + '" cy="' + lastY + '" r="3" fill="' + color + '" style="filter:drop-shadow(0 0 4px ' + color + ')"/>' +
+            '</svg>' +
+            '<div style="display:flex;justify-content:space-between;margin-top:2px;font-size:10px;color:var(--text-muted)">' +
+              '<span>min ' + minVal + '</span>' +
+              '<span>' + n + ' samples</span>' +
+              '<span>max ' + maxVal + '</span>' +
+            '</div>' +
+          '</div>';
+        }
+        var cpuData = history.map(function(p) { return p.cpuLoad; });
+        var memData = history.map(function(p) { return p.memPct; });
+        var latest = history[history.length - 1];
+        var oldest = history[0];
+        var spanMin = Math.round((Date.now() - oldest.ts) / 60000);
+        var html = sparkline(cpuData, 'var(--accent-cyan)', 'CPU Load (1m avg)', '', 2);
+        html += sparkline(memData, 'var(--accent-purple)', 'RAM Used', '%', 1);
+        html += '<div style="font-size:11px;color:var(--text-muted);text-align:right;margin-top:-4px">~' + spanMin + 'min window · samples every 15s</div>';
+        document.getElementById('resourceHistoryContent').innerHTML = html;
+      });
+
+      // ── Hourly Heatmap + Daily Sessions chart ─────────────────────────
+      safeFetch('/api/sessions/hourly').then(function(hourlyData) {
+        if (!hourlyData) { cardErr('hourlyContent'); cardErr('dailySessionContent'); return; }
+        if (hourlyData.hourBuckets) {
+          var hb = hourlyData.hourBuckets;
+          var tb = hourlyData.toolBuckets || new Array(24).fill(0);
+          var maxH = Math.max.apply(null, hb) || 1;
+          var peakHour = hourlyData.peakHour;
+          var timeLabels = ['12a','1a','2a','3a','4a','5a','6a','7a','8a','9a','10a','11a','12p','1p','2p','3p','4p','5p','6p','7p','8p','9p','10p','11p'];
+          var heatHtml = '<div style="margin-bottom:12px">';
+          heatHtml += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><span style="font-size:12px;color:var(--text-muted)">7-day session starts · peak: ' + (peakHour !== undefined ? timeLabels[peakHour] + ' UTC (' + hb[peakHour] + ' sessions)' : '—') + '</span></div>';
+          heatHtml += '<div style="display:flex;align-items:flex-end;gap:2px;height:52px;padding:0 2px">';
+          for (var h = 0; h < 24; h++) {
+            var pct2 = maxH > 0 ? Math.max(hb[h] / maxH * 100, hb[h] > 0 ? 8 : 2) : 2;
+            var isPeak = h === peakHour && hb[h] > 0;
+            var isNight = h >= 0 && h < 6;
+            var bColor = isPeak ? 'var(--accent-amber)' : isNight ? 'rgba(139,92,246,0.6)' : 'var(--accent-cyan)';
+            heatHtml += '<div style="flex:1;display:flex;flex-direction:column;align-items:center;cursor:default" title="' + timeLabels[h] + ': ' + hb[h] + ' sess, ' + (tb[h]||0) + ' tools"><div style="width:100%;background:' + bColor + ';border-radius:2px 2px 0 0;height:' + pct2 + '%;' + (isPeak ? 'box-shadow:0 0 6px var(--accent-amber);' : '') + 'transition:height 0.5s"></div></div>';
+          }
+          heatHtml += '</div>';
+          heatHtml += '<div style="display:flex;justify-content:space-between;margin-top:4px;padding:0 2px"><span style="font-size:9px;color:var(--text-muted)">12am</span><span style="font-size:9px;color:var(--text-muted)">6am</span><span style="font-size:9px;color:var(--text-muted)">12pm</span><span style="font-size:9px;color:var(--text-muted)">6pm</span><span style="font-size:9px;color:var(--text-muted)">11pm</span></div>';
+          heatHtml += '<div style="display:flex;gap:16px;margin-top:12px;flex-wrap:wrap"><span style="font-size:11px;color:var(--text-muted)"><span style="color:var(--accent-amber)">●</span> Peak hour</span><span style="font-size:11px;color:var(--text-muted)"><span style="color:rgba(139,92,246,0.8)">●</span> Night (12am–5am)</span><span style="font-size:11px;color:var(--text-muted)"><span style="color:var(--accent-cyan)">●</span> Daytime</span></div>';
+          heatHtml += '<div style="margin-top:12px;display:flex;gap:24px"><div style="font-size:12px;color:var(--text-secondary)">Total sessions: <strong style="color:var(--text-primary)">' + hourlyData.totalSessions + '</strong></div><div style="font-size:12px;color:var(--text-secondary)">Tool calls: <strong style="color:var(--text-primary)">' + (hourlyData.totalTools >= 1000 ? (hourlyData.totalTools/1000).toFixed(1)+'K' : hourlyData.totalTools) + '</strong></div></div>';
+          heatHtml += '</div>';
+          document.getElementById('hourlyContent').innerHTML = heatHtml;
+        } else {
+          document.getElementById('hourlyContent').innerHTML = '<div style="color:var(--text-muted);text-align:center;padding:20px">No data yet</div>';
+        }
+        if (hourlyData.sevenDayBreakdown) {
+          var sbd = hourlyData.sevenDayBreakdown;
+          var maxDay2 = Math.max.apply(null, sbd.map(function(d) { return d.sessions; })) || 1;
+          var today2 = new Date().toISOString().split('T')[0];
+          var dailyHtml2 = '<div style="display:flex;gap:4px;align-items:flex-end;height:72px;padding:0 2px">';
+          sbd.forEach(function(d) {
+            var pct3 = d.sessions > 0 ? Math.max(d.sessions / maxDay2 * 100, 8) : 2;
+            var isToday = d.date === today2;
+            var dColor = isToday ? 'linear-gradient(180deg,var(--accent-amber),var(--accent-pink))' : 'linear-gradient(180deg,var(--accent-cyan),var(--accent-purple))';
+            var dow = ['Su','Mo','Tu','We','Th','Fr','Sa'][new Date(d.date + 'T12:00:00Z').getUTCDay()];
+            dailyHtml2 += '<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px" title="' + d.date + ': ' + d.sessions + ' sessions"><div style="font-size:10px;color:' + (isToday ? 'var(--accent-amber)' : 'var(--text-secondary)') + '">' + d.sessions + '</div><div style="width:100%;background:' + dColor + ';border-radius:4px 4px 0 0;height:' + pct3 + '%;transition:height 0.5s"></div><div style="font-size:9px;color:' + (isToday ? 'var(--accent-amber)' : 'var(--text-muted)') + ';font-weight:' + (isToday ? '700' : '400') + '">' + dow + '</div></div>';
+          });
+          dailyHtml2 += '</div>';
+          var busiest = sbd.reduce(function(a, b) { return b.sessions > a.sessions ? b : a; }, sbd[0]);
+          dailyHtml2 += '<div style="margin-top:14px;font-size:12px;color:var(--text-secondary)">Busiest day: <strong style="color:var(--accent-cyan)">' + (busiest ? busiest.date + ' (' + busiest.sessions + ' sessions)' : '—') + '</strong></div>';
+          document.getElementById('dailySessionContent').innerHTML = dailyHtml2;
+        } else {
+          document.getElementById('dailySessionContent').innerHTML = '<div style="color:var(--text-muted);text-align:center;padding:20px">No data yet</div>';
+        }
+      });
+    }
+
+    function updateStatusIndicator(liveStatus) {
+      if (!liveStatus || !liveStatus.mainSession) return;
+      
+      var mainSession = liveStatus.mainSession;
+      var dot = document.getElementById('statusDot');
+      var text = document.getElementById('statusText');
+      var desc = document.getElementById('statusDescription');
+      var time = document.getElementById('statusTime');
+      
+      // Remove all status classes
+      dot.className = 'status-dot';
+      
+      if (mainSession.status === 'active') {
+        dot.classList.add('processing');
+        var activeText = '🟢 Active';
+        if (liveStatus.activeSubagents > 0) activeText += ' (' + liveStatus.activeSubagents + ' sub-agent' + (liveStatus.activeSubagents > 1 ? 's' : '') + ')';
+        text.textContent = activeText;
+        desc.textContent = mainSession.description || 'Processing request';
+        
+        if (mainSession.ageMs !== undefined) {
+          var seconds = Math.floor(mainSession.ageMs / 1000);
+          var timeText = seconds < 60 ? seconds + 's ago' : Math.floor(seconds / 60) + 'm ago';
+          time.textContent = 'Active (' + timeText + ')';
+        } else {
+          time.textContent = 'Active now';
+        }
+      } else if (mainSession.status === 'idle') {
+        dot.classList.add('idle');
+        text.textContent = '💤 Idle';
+        desc.textContent = mainSession.description || 'Waiting for requests';
+        
+        if (mainSession.lastActivity) {
+          var lastTime = new Date(mainSession.lastActivity);
+          var now = new Date();
+          var diffMs = now - lastTime;
+          var diffMins = Math.floor(diffMs / 60000);
+          
+          if (diffMins < 60) {
+            time.textContent = 'Idle since ' + diffMins + 'm ago';
+          } else {
+            var hours = Math.floor(diffMins / 60);
+            time.textContent = 'Idle since ' + hours + 'h ago';
+          }
+        } else {
+          time.textContent = 'Status unknown';
+        }
+      } else {
+        dot.classList.add('idle');
+        text.textContent = '❓ Unknown';
+        desc.textContent = 'Status uncertain';
+        time.textContent = 'Check connection';
+      }
+      
+      // Add system activity info if available
+      if (liveStatus.systemActivity && liveStatus.systemActivity !== 'No recent activity') {
+        desc.textContent = liveStatus.systemActivity;
+      }
+    }
+
+    // Separate function to update live status more frequently
+    async function updateLiveStatus() {
+      try {
+        var liveStatus = await fetch('/api/status/heartbeat', { credentials: 'same-origin' }).then(function(r) { return r.ok ? r.json() : null; });
+        if (liveStatus) updateStatusIndicator(liveStatus);
+      } catch (e) {
+        console.warn('Failed to update live status:', e);
+      }
+    }
+
+    var countdown = 15;
+    setInterval(function() {
+      countdown--;
+      document.getElementById('countdown').textContent = countdown;
+      if (countdown <= 0) {
+        countdown = 15;
+        fetchAll();
+      }
+    }, 1000);
+
+    fetchAll();
+    
+    // Update live status every 5 seconds
+    setInterval(updateLiveStatus, 5000);
+  </script>
+</body>
+</html>

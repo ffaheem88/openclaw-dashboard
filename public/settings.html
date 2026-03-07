@@ -1,0 +1,1156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>⚙️ Clawdbot Settings</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+
+:root{
+  --bg-primary:#0a0e17;
+  --bg-secondary:#0f1420;
+  --glass-bg:rgba(255,255,255,0.03);
+  --glass-border:rgba(255,255,255,0.08);
+  --text-primary:#f1f5f9;
+  --text-secondary:#94a3b8;
+  --accent-cyan:#06b6d4;
+  --accent-purple:#8b5cf6;
+  --accent-pink:#ec4899;
+  --accent-emerald:#10b981;
+  --accent-amber:#f59e0b;
+  --gradient-main:linear-gradient(135deg,#06b6d4,#8b5cf6,#ec4899)
+}
+
+body{
+  background:var(--bg-primary);
+  color:var(--text-primary);
+  font-family:'Inter',system-ui,-apple-system,sans-serif;
+  font-size:14px;
+  line-height:1.6;
+  min-height:100vh;
+  overflow-x:hidden;
+  position:relative
+}
+
+/* Animated Background */
+body::before{
+  content:'';
+  position:fixed;
+  top:0;
+  left:0;
+  right:0;
+  bottom:0;
+  background:
+    radial-gradient(ellipse 80% 50% at 20% 20%,rgba(6,182,212,0.15) 0%,transparent 50%),
+    radial-gradient(ellipse 60% 40% at 80% 80%,rgba(139,92,246,0.12) 0%,transparent 50%),
+    radial-gradient(ellipse 50% 30% at 50% 50%,rgba(236,72,153,0.08) 0%,transparent 50%);
+  pointer-events:none;
+  z-index:0;
+  animation:bgPulse 15s ease-in-out infinite
+}
+
+@keyframes bgPulse{
+  0%,100%{opacity:1;transform:scale(1)}
+  50%{opacity:0.8;transform:scale(1.05)}
+}
+
+/* Fade-in animation */
+@keyframes fadeInUp{
+  from{
+    opacity:0;
+    transform:translateY(20px)
+  }
+  to{
+    opacity:1;
+    transform:translateY(0)
+  }
+}
+
+.fade-in{
+  animation:fadeInUp 0.6s ease-out forwards
+}
+
+.fade-in-delay-1{animation-delay:0.1s;opacity:0}
+.fade-in-delay-2{animation-delay:0.2s;opacity:0}
+.fade-in-delay-3{animation-delay:0.3s;opacity:0}
+
+/* Header */
+.header{
+  background:rgba(15,20,32,0.8);
+  backdrop-filter:blur(20px);
+  -webkit-backdrop-filter:blur(20px);
+  border-bottom:1px solid var(--glass-border);
+  padding:20px 32px;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  position:relative;
+  z-index:10
+}
+
+.header h1{
+  font-size:24px;
+  font-weight:700;
+  background:var(--gradient-main);
+  -webkit-background-clip:text;
+  -webkit-text-fill-color:transparent;
+  background-clip:text;
+  letter-spacing:-0.5px
+}
+
+.header-subtitle{
+  color:var(--text-secondary);
+  font-size:13px;
+  font-weight:400;
+  margin-top:2px
+}
+
+.nav-links{
+  display:flex;
+  gap:8px
+}
+
+.nav-links a{
+  color:var(--text-secondary);
+  text-decoration:none;
+  font-size:13px;
+  font-weight:500;
+  padding:8px 16px;
+  border-radius:8px;
+  transition:all 0.3s ease;
+  background:var(--glass-bg);
+  border:1px solid transparent
+}
+
+.nav-links a:hover{
+  color:var(--text-primary);
+  background:rgba(6,182,212,0.1);
+  border-color:rgba(6,182,212,0.3);
+  box-shadow:0 0 20px rgba(6,182,212,0.15)
+}
+
+/* Container */
+.container{
+  max-width:1400px;
+  margin:0 auto;
+  padding:32px;
+  position:relative;
+  z-index:1
+}
+
+.section{
+  margin-bottom:40px
+}
+
+.section-title{
+  font-size:13px;
+  font-weight:600;
+  text-transform:uppercase;
+  letter-spacing:2px;
+  color:var(--accent-cyan);
+  margin-bottom:8px;
+  display:flex;
+  align-items:center;
+  gap:8px
+}
+
+.section-title::before{
+  content:'';
+  width:4px;
+  height:16px;
+  background:var(--gradient-main);
+  border-radius:2px
+}
+
+.section-desc{
+  color:var(--text-secondary);
+  font-size:13px;
+  margin-bottom:20px;
+  font-weight:400
+}
+
+/* Balance Bar */
+.balance-bar{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+  gap:16px;
+  margin-bottom:32px
+}
+
+.balance-card{
+  background:var(--glass-bg);
+  backdrop-filter:blur(20px);
+  -webkit-backdrop-filter:blur(20px);
+  border:1px solid var(--glass-border);
+  border-radius:16px;
+  padding:24px;
+  text-align:center;
+  position:relative;
+  overflow:hidden;
+  transition:all 0.4s cubic-bezier(0.4,0,0.2,1)
+}
+
+.balance-card::before{
+  content:'';
+  position:absolute;
+  top:0;
+  left:0;
+  right:0;
+  height:1px;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,0.1),transparent)
+}
+
+.balance-card:hover{
+  transform:translateY(-4px);
+  border-color:rgba(6,182,212,0.3);
+  box-shadow:
+    0 20px 40px rgba(0,0,0,0.3),
+    0 0 40px rgba(6,182,212,0.1),
+    inset 0 1px 0 rgba(255,255,255,0.05)
+}
+
+.balance-card:nth-child(1):hover{box-shadow:0 20px 40px rgba(0,0,0,0.3),0 0 40px rgba(16,185,129,0.15)}
+.balance-card:nth-child(2):hover{box-shadow:0 20px 40px rgba(0,0,0,0.3),0 0 40px rgba(6,182,212,0.15)}
+.balance-card:nth-child(3):hover{box-shadow:0 20px 40px rgba(0,0,0,0.3),0 0 40px rgba(139,92,246,0.15)}
+.balance-card:nth-child(4):hover{box-shadow:0 20px 40px rgba(0,0,0,0.3),0 0 40px rgba(245,158,11,0.15)}
+
+.balance-number{
+  font-size:36px;
+  font-weight:800;
+  letter-spacing:-1px;
+  margin-bottom:4px
+}
+
+.balance-label{
+  color:var(--text-secondary);
+  font-size:11px;
+  text-transform:uppercase;
+  letter-spacing:1.5px;
+  font-weight:500
+}
+
+/* Task Grid */
+.task-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(380px,1fr));
+  gap:16px;
+  overflow:visible
+}
+
+.task-card{
+  background:var(--glass-bg);
+  backdrop-filter:blur(20px);
+  -webkit-backdrop-filter:blur(20px);
+  border:1px solid var(--glass-border);
+  border-radius:16px;
+  padding:24px;
+  position:relative;
+  overflow:visible;
+  transition:all 0.4s cubic-bezier(0.4,0,0.2,1);
+  z-index:1
+}
+.task-card:has(.search-select-dropdown.open){
+  z-index:50
+}
+
+.task-card::before{
+  content:'';
+  position:absolute;
+  top:0;
+  left:0;
+  right:0;
+  height:1px;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,0.1),transparent)
+}
+
+.task-card:hover{
+  transform:translateY(-2px);
+  border-color:rgba(139,92,246,0.3);
+  box-shadow:
+    0 16px 32px rgba(0,0,0,0.25),
+    0 0 30px rgba(139,92,246,0.08)
+}
+
+.task-header{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  margin-bottom:12px
+}
+
+.task-name{
+  font-weight:600;
+  font-size:15px;
+  color:var(--text-primary)
+}
+
+.task-icon{
+  font-size:28px;
+  filter:drop-shadow(0 0 8px rgba(6,182,212,0.3))
+}
+
+.task-desc{
+  color:var(--text-secondary);
+  font-size:13px;
+  margin-bottom:16px;
+  font-weight:400
+}
+
+.task-cost{
+  color:var(--text-secondary);
+  font-size:12px;
+  margin-top:12px;
+  padding-top:12px;
+  border-top:1px solid var(--glass-border);
+  font-weight:400
+}
+
+.task-cost .price{
+  color:var(--accent-emerald);
+  font-weight:600
+}
+
+/* Search Select Dropdown */
+.search-select{
+  position:relative;
+  width:100%
+}
+
+.search-select-input{
+  width:100%;
+  padding:12px 16px;
+  background:rgba(10,14,23,0.6);
+  border:1px solid var(--glass-border);
+  border-radius:12px;
+  color:var(--text-primary);
+  font-family:inherit;
+  font-size:13px;
+  font-weight:400;
+  cursor:pointer;
+  transition:all 0.3s ease
+}
+
+.search-select-input:hover{
+  border-color:rgba(6,182,212,0.3);
+  background:rgba(10,14,23,0.8)
+}
+
+.search-select-input:focus{
+  outline:none;
+  border-color:var(--accent-cyan);
+  box-shadow:0 0 20px rgba(6,182,212,0.15)
+}
+
+.search-select-dropdown{
+  display:none;
+  position:absolute;
+  top:calc(100% + 8px);
+  left:0;
+  right:0;
+  z-index:100;
+  background:rgba(15,20,32,0.95);
+  backdrop-filter:blur(20px);
+  -webkit-backdrop-filter:blur(20px);
+  border:1px solid rgba(6,182,212,0.3);
+  border-radius:12px;
+  max-height:320px;
+  overflow:hidden;
+  box-shadow:
+    0 16px 48px rgba(0,0,0,0.5),
+    0 0 30px rgba(6,182,212,0.1)
+}
+
+.search-select-dropdown.open{
+  display:block;
+  animation:fadeInUp 0.2s ease-out
+}
+
+.search-select-filter{
+  width:100%;
+  padding:12px 16px;
+  background:rgba(10,14,23,0.8);
+  border:none;
+  border-bottom:1px solid var(--glass-border);
+  color:var(--text-primary);
+  font-family:inherit;
+  font-size:13px;
+  font-weight:400;
+  outline:none
+}
+
+.search-select-filter::placeholder{
+  color:var(--text-secondary)
+}
+
+.search-select-filter:focus{
+  background:rgba(10,14,23,1)
+}
+
+.search-select-list{
+  max-height:260px;
+  overflow-y:auto
+}
+
+.search-select-list::-webkit-scrollbar{
+  width:6px
+}
+
+.search-select-list::-webkit-scrollbar-track{
+  background:transparent
+}
+
+.search-select-list::-webkit-scrollbar-thumb{
+  background:rgba(255,255,255,0.1);
+  border-radius:3px
+}
+
+.search-select-list::-webkit-scrollbar-thumb:hover{
+  background:rgba(255,255,255,0.2)
+}
+
+.search-select-group{
+  padding:8px 16px;
+  font-size:10px;
+  text-transform:uppercase;
+  letter-spacing:1.5px;
+  color:var(--accent-cyan);
+  background:rgba(6,182,212,0.05);
+  font-weight:600;
+  border-bottom:1px solid var(--glass-border)
+}
+
+.search-select-option{
+  padding:10px 16px;
+  cursor:pointer;
+  font-size:13px;
+  font-weight:400;
+  transition:all 0.2s ease;
+  border-bottom:1px solid rgba(255,255,255,0.03)
+}
+
+.search-select-option:hover{
+  background:rgba(6,182,212,0.1);
+  padding-left:20px
+}
+
+.search-select-option.selected{
+  background:rgba(6,182,212,0.15);
+  color:var(--accent-cyan);
+  font-weight:500
+}
+
+.search-select-option.selected::before{
+  content:'✓ ';
+  opacity:0.8
+}
+
+/* Search Box */
+.search-box{
+  display:flex;
+  gap:12px;
+  margin-bottom:20px
+}
+
+.search-input{
+  flex:1;
+  padding:14px 20px;
+  background:var(--glass-bg);
+  backdrop-filter:blur(10px);
+  border:1px solid var(--glass-border);
+  border-radius:12px;
+  color:var(--text-primary);
+  font-family:inherit;
+  font-size:14px;
+  font-weight:400;
+  transition:all 0.3s ease
+}
+
+.search-input::placeholder{
+  color:var(--text-secondary)
+}
+
+.search-input:hover{
+  border-color:rgba(6,182,212,0.3)
+}
+
+.search-input:focus{
+  outline:none;
+  border-color:var(--accent-cyan);
+  box-shadow:0 0 24px rgba(6,182,212,0.15);
+  background:rgba(10,14,23,0.6)
+}
+
+/* Provider Filter */
+.provider-filter{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+  margin-bottom:16px
+}
+
+.filter-btn{
+  padding:10px 18px;
+  background:var(--glass-bg);
+  backdrop-filter:blur(10px);
+  border:1px solid var(--glass-border);
+  border-radius:10px;
+  color:var(--text-secondary);
+  cursor:pointer;
+  font-family:inherit;
+  font-size:12px;
+  font-weight:500;
+  transition:all 0.3s ease
+}
+
+.filter-btn:hover{
+  background:rgba(6,182,212,0.1);
+  border-color:rgba(6,182,212,0.3);
+  color:var(--text-primary)
+}
+
+.filter-btn.active{
+  border-color:var(--accent-cyan);
+  color:var(--accent-cyan);
+  background:rgba(6,182,212,0.15);
+  box-shadow:0 0 20px rgba(6,182,212,0.15)
+}
+
+/* Model Count */
+.model-count{
+  color:var(--text-secondary);
+  font-size:13px;
+  margin-bottom:16px;
+  font-weight:400
+}
+
+/* Model Table Container */
+.model-table-container{
+  background:var(--glass-bg);
+  backdrop-filter:blur(20px);
+  -webkit-backdrop-filter:blur(20px);
+  border:1px solid var(--glass-border);
+  border-radius:16px;
+  overflow:hidden;
+  max-height:600px;
+  overflow-y:auto;
+  position:relative
+}
+
+.model-table-container::before{
+  content:'';
+  position:absolute;
+  top:0;
+  left:0;
+  right:0;
+  height:1px;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,0.1),transparent);
+  z-index:1
+}
+
+.model-table-container::-webkit-scrollbar{
+  width:8px
+}
+
+.model-table-container::-webkit-scrollbar-track{
+  background:transparent
+}
+
+.model-table-container::-webkit-scrollbar-thumb{
+  background:rgba(255,255,255,0.1);
+  border-radius:4px
+}
+
+.model-table-container::-webkit-scrollbar-thumb:hover{
+  background:rgba(255,255,255,0.2)
+}
+
+.test-model-btn{background:none;border:1px solid rgba(255,255,255,0.15);border-radius:6px;cursor:pointer;font-size:14px;padding:4px 8px;transition:all 0.2s}
+.test-model-btn:hover{background:rgba(99,102,241,0.2);border-color:var(--accent-purple)}
+.test-model-btn:disabled{opacity:0.5;cursor:wait}
+.test-toast{position:fixed;top:20px;right:20px;max-width:450px;padding:14px 36px 14px 16px;border-radius:10px;font-size:13px;line-height:1.6;z-index:9999;box-shadow:0 8px 32px rgba(0,0,0,0.4);transition:opacity 0.5s;backdrop-filter:blur(12px)}
+.test-toast-success{background:rgba(16,185,129,0.15);border:1px solid rgba(16,185,129,0.3);color:#d1fae5}
+.test-toast-error{background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.3);color:#fecaca}
+.test-toast-close{position:absolute;top:8px;right:10px;cursor:pointer;opacity:0.6;font-size:16px}
+.test-toast-close:hover{opacity:1}
+
+/* Model Table */
+.model-table{
+  width:100%;
+  border-collapse:collapse
+}
+
+.model-table th{
+  text-align:left;
+  padding:14px 16px;
+  font-size:11px;
+  text-transform:uppercase;
+  letter-spacing:1.5px;
+  color:var(--text-secondary);
+  border-bottom:1px solid var(--glass-border);
+  cursor:pointer;
+  font-weight:600;
+  background:rgba(10,14,23,0.5);
+  position:sticky;
+  top:0;
+  z-index:2;
+  transition:color 0.3s ease
+}
+
+.model-table th:hover{
+  color:var(--accent-cyan)
+}
+
+.model-table td{
+  padding:12px 16px;
+  border-bottom:1px solid rgba(255,255,255,0.03);
+  font-size:13px;
+  font-weight:400
+}
+
+.model-table tr{
+  transition:all 0.3s ease
+}
+
+.model-table tr:hover{
+  background:rgba(6,182,212,0.05)
+}
+
+.model-name{
+  font-weight:500;
+  color:var(--text-primary)
+}
+
+/* Price Colors */
+.price-free{color:var(--accent-emerald);font-weight:600}
+.price-cheap{color:var(--accent-cyan);font-weight:500}
+.price-mid{color:var(--accent-amber);font-weight:500}
+.price-high{color:var(--accent-pink);font-weight:500}
+
+/* Context Badge */
+.ctx-badge{
+  background:rgba(255,255,255,0.05);
+  padding:4px 10px;
+  border-radius:6px;
+  font-size:11px;
+  font-weight:500;
+  color:var(--text-secondary);
+  border:1px solid rgba(255,255,255,0.05)
+}
+
+/* Badge */
+.badge{
+  display:inline-block;
+  padding:4px 10px;
+  border-radius:6px;
+  font-size:11px;
+  font-weight:600;
+  letter-spacing:0.5px
+}
+
+.badge-free{
+  background:rgba(16,185,129,0.15);
+  color:var(--accent-emerald);
+  border:1px solid rgba(16,185,129,0.3)
+}
+
+.badge-ok{
+  background:rgba(16,185,129,0.15);
+  color:var(--accent-emerald)
+}
+
+/* Save Button */
+.save-btn{
+  padding:14px 36px;
+  background:var(--gradient-main);
+  border:none;
+  border-radius:12px;
+  color:#fff;
+  font-family:inherit;
+  font-size:14px;
+  font-weight:700;
+  cursor:pointer;
+  transition:all 0.4s cubic-bezier(0.4,0,0.2,1);
+  position:relative;
+  overflow:hidden;
+  letter-spacing:0.5px
+}
+
+.save-btn::before{
+  content:'';
+  position:absolute;
+  top:0;
+  left:-100%;
+  width:100%;
+  height:100%;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,0.2),transparent);
+  transition:left 0.5s ease
+}
+
+.save-btn:hover{
+  transform:translateY(-2px);
+  box-shadow:
+    0 12px 28px rgba(139,92,246,0.3),
+    0 0 40px rgba(6,182,212,0.2)
+}
+
+.save-btn:hover::before{
+  left:100%
+}
+
+.save-btn:active{
+  transform:translateY(0)
+}
+
+.save-btn:disabled{
+  opacity:0.6;
+  cursor:not-allowed;
+  transform:none
+}
+
+.save-status{
+  color:var(--accent-emerald);
+  font-size:14px;
+  font-weight:500;
+  margin-left:16px;
+  display:none
+}
+
+/* Save Container */
+.save-container{
+  margin-top:24px;
+  display:flex;
+  align-items:center
+}
+
+/* Responsive */
+@media(max-width:768px){
+  .container{padding:16px}
+  .header{padding:16px;flex-direction:column;gap:16px;text-align:center}
+  .balance-bar{grid-template-columns:repeat(2,1fr)}
+  .task-grid{grid-template-columns:1fr}
+  .balance-number{font-size:28px}
+}
+.health-card{display:flex;align-items:center;gap:12px;background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:12px;padding:16px 20px}
+.health-dot{width:14px;height:14px;border-radius:50%;flex-shrink:0;background:#555;transition:background .3s}
+.health-dot.ok{background:#10b981;box-shadow:0 0 8px #10b98166}
+.health-dot.down{background:#ef4444;box-shadow:0 0 8px #ef444466}
+.health-meta{font-size:12px;color:var(--text-secondary);margin-top:2px}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>⚙️ Settings</h1>
+    <div class="header-subtitle">Models • Tasks • Configuration</div>
+  </div>
+  <div class="nav-links">
+    <a href="/">📊 Dashboard</a>
+    <a href="/mail.html">📧 Mail</a>
+    <a href="/agents.html">🎛️ Agents</a>
+    <a href="/neural.html">🧠 Neural</a>
+    <a href="/logs.html">📋 Logs</a>
+    <a href="/identity.html">🧠 Identity</a>
+    <a href="/logout" style="color: var(--accent-red, #ef4444);">⏏ Logout</a>
+  </div>
+</div>
+
+<div class="container">
+  <!-- Balance Bar -->
+  <div class="balance-bar fade-in">
+    <div class="balance-card">
+      <div class="balance-number" style="color:var(--accent-emerald)" id="orBalance">...</div>
+      <div class="balance-label">OpenRouter Balance</div>
+    </div>
+    <div class="balance-card">
+      <div class="balance-number" style="color:var(--accent-cyan)" id="primaryModel">...</div>
+      <div class="balance-label">Primary Model</div>
+    </div>
+    <div class="balance-card">
+      <div class="balance-number" style="color:var(--accent-purple)" id="totalModels">...</div>
+      <div class="balance-label">Available Models</div>
+    </div>
+    <div class="balance-card">
+      <div class="balance-number" style="color:var(--accent-amber)" id="freeModels">...</div>
+      <div class="balance-label">Free Models</div>
+    </div>
+    <div class="balance-card">
+      <div class="balance-number" style="color:var(--accent-pink)" id="costToday">...</div>
+      <div class="balance-label">Spent Today</div>
+    </div>
+    <div class="balance-card">
+      <div class="balance-number" style="color:var(--accent-amber)" id="costWeek">...</div>
+      <div class="balance-label">Spent (7 Days)</div>
+    </div>
+  </div>
+
+  <!-- Provider Health Section -->
+  <div class="section fade-in">
+    <div class="section-title">🏥 Provider Health</div>
+    <p class="section-desc" id="healthCheckedAt">Real-time reachability of LLM providers. Auto-refreshes every 60s.</p>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;margin-top:12px" id="healthGrid">
+      <div class="health-card" id="hc-anthropic"><span class="health-dot" id="hd-anthropic"></span><div><strong>Anthropic</strong><div class="health-meta" id="hm-anthropic">Checking...</div></div></div>
+      <div class="health-card" id="hc-openai-codex"><span class="health-dot" id="hd-openai-codex"></span><div><strong>OpenAI Codex</strong><div class="health-meta" id="hm-openai-codex">Checking...</div></div></div>
+      <div class="health-card" id="hc-openrouter"><span class="health-dot" id="hd-openrouter"></span><div><strong>OpenRouter</strong><div class="health-meta" id="hm-openrouter">Checking...</div></div></div>
+      <div class="health-card" id="hc-ollama"><span class="health-dot" id="hd-ollama"></span><div><strong>Ollama</strong><div class="health-meta" id="hm-ollama">Checking...</div></div></div>
+    </div>
+  </div>
+
+  <!-- Network & Tunnel Status Section -->
+  <div class="section fade-in" style="margin-top:24px" id="networkSection">
+    <div class="section-title">📡 Network & Tunnel Status</div>
+    <p class="section-desc" id="networkCheckedAt">Cloudflare tunnel, public URL reachability, and local port status. Auto-refreshes every 30s.</p>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-top:16px" id="networkGrid">
+      <div class="health-card"><span class="health-dot" id="nd-tunnel"></span><div><strong>Cloudflare Tunnel</strong><div class="health-meta" id="nm-tunnel">Checking…</div></div></div>
+      <div class="health-card"><span class="health-dot" id="nd-port"></span><div><strong>Local Port 3000</strong><div class="health-meta" id="nm-port">Checking…</div></div></div>
+      <div class="health-card"><span class="health-dot" id="nd-arc"></span><div><strong>arc.net.pk (Public)</strong><div class="health-meta" id="nm-arc">Checking…</div></div></div>
+      <div class="health-card"><span class="health-dot" id="nd-dashboard"></span><div><strong>dashboard.arc.net.pk</strong><div class="health-meta" id="nm-dashboard">Checking…</div></div></div>
+    </div>
+    <div style="margin-top:14px;display:flex;gap:10px;align-items:center">
+      <button onclick="loadNetworkStatus()" style="padding:8px 18px;background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:8px;color:var(--text-primary);font-family:inherit;font-size:12px;font-weight:500;cursor:pointer;transition:all .2s">🔄 Refresh Now</button>
+      <span id="networkTunnelId" style="font-size:11px;color:var(--text-muted);font-family:monospace"></span>
+    </div>
+  </div>
+
+  <!-- Budget Alerts Section -->
+  <div class="section fade-in fade-in-delay-1">
+    <div class="section-title">💰 Budget Alerts</div>
+    <p class="section-desc">Set spending limits and get alerts when approaching thresholds.</p>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px">
+      <div style="background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:12px;padding:16px">
+        <label style="font-size:12px;color:var(--text-secondary);display:block;margin-bottom:6px">Daily Limit ($)</label>
+        <input type="number" id="budgetDaily" step="0.50" min="0" style="width:100%;background:rgba(255,255,255,0.05);border:1px solid var(--glass-border);border-radius:8px;padding:10px 12px;color:var(--text-primary);font-size:16px;font-family:inherit" value="5.00">
+      </div>
+      <div style="background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:12px;padding:16px">
+        <label style="font-size:12px;color:var(--text-secondary);display:block;margin-bottom:6px">Weekly Limit ($)</label>
+        <input type="number" id="budgetWeekly" step="1.00" min="0" style="width:100%;background:rgba(255,255,255,0.05);border:1px solid var(--glass-border);border-radius:8px;padding:10px 12px;color:var(--text-primary);font-size:16px;font-family:inherit" value="20.00">
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:var(--text-secondary)">
+        <input type="checkbox" id="budgetAlertEnabled" checked style="width:18px;height:18px;accent-color:var(--accent-cyan)">
+        Enable budget alerts
+      </label>
+    </div>
+    <div id="budgetProgress" style="margin-bottom:16px"></div>
+    <div style="display:flex;align-items:center;gap:12px">
+      <button onclick="saveBudget()" style="background:var(--gradient-main);color:#fff;border:none;border-radius:8px;padding:10px 24px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">💾 Save Budget</button>
+      <span id="budgetSaveStatus" style="display:none;color:var(--accent-emerald);font-size:13px">✅ Saved!</span>
+    </div>
+  </div>
+
+  <!-- Task Assignment Section -->
+  <div class="section fade-in fade-in-delay-2">
+    <div class="section-title">🎯 Task → Model Assignment</div>
+    <p class="section-desc">Assign models to task types for sub-agent routing.</p>
+    <div class="task-grid" id="taskGrid">Loading...</div>
+    <div class="save-container">
+      <button class="save-btn" id="saveBtn" onclick="saveAssignments()">💾 Save Assignments</button>
+      <span class="save-status" id="saveStatus">✅ Saved!</span>
+    </div>
+  </div>
+
+  <!-- Model Explorer Section -->
+  <div class="section fade-in fade-in-delay-3">
+    <div class="section-title">🔍 Model Explorer</div>
+    <div class="search-box">
+      <input class="search-input" id="searchInput" placeholder="Search models..." oninput="filterModels()">
+    </div>
+    <div class="provider-filter" id="providerFilter"></div>
+    <div class="model-count" id="modelCount">Loading...</div>
+    <div class="model-table-container">
+      <table class="model-table">
+        <thead>
+          <tr>
+            <th onclick="sortModels('name')">Model ↕</th>
+            <th onclick="sortModels('prompt')">Input $/M ↕</th>
+            <th onclick="sortModels('completion')">Output $/M ↕</th>
+            <th onclick="sortModels('context')">Context ↕</th>
+            <th>Free?</th>
+            <th>Test</th>
+          </tr>
+        </thead>
+        <tbody id="modelTable">
+          <tr><td colspan="6" style="text-align:center;padding:20px;color:var(--text-secondary)">Loading...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Admin Controls Section -->
+  <div class="section fade-in" style="margin-top:24px" id="adminSection">
+    <div class="section-title">🛠️ Admin Controls</div>
+    <p class="section-desc">Cache management, process stats, and workspace disk usage.</p>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin:16px 0" id="adminStatCards">
+      <div style="background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:12px;padding:16px">
+        <div style="font-size:11px;text-transform:uppercase;letter-spacing:1.2px;color:var(--text-secondary);margin-bottom:6px">Cache Keys</div>
+        <div style="font-size:28px;font-weight:700;color:var(--accent-cyan)" id="adminCacheKeys">—</div>
+        <div style="font-size:12px;color:var(--text-secondary);margin-top:4px">warm entries</div>
+      </div>
+      <div style="background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:12px;padding:16px">
+        <div style="font-size:11px;text-transform:uppercase;letter-spacing:1.2px;color:var(--text-secondary);margin-bottom:6px">Process Memory</div>
+        <div style="font-size:28px;font-weight:700;color:var(--accent-purple)" id="adminProcMem">—</div>
+        <div style="font-size:12px;color:var(--text-secondary);margin-top:4px">MB RSS</div>
+      </div>
+      <div style="background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:12px;padding:16px">
+        <div style="font-size:11px;text-transform:uppercase;letter-spacing:1.2px;color:var(--text-secondary);margin-bottom:6px">Process Uptime</div>
+        <div style="font-size:28px;font-weight:700;color:var(--accent-emerald)" id="adminUptime">—</div>
+        <div style="font-size:12px;color:var(--text-secondary);margin-top:4px">seconds</div>
+      </div>
+      <div style="background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:12px;padding:16px">
+        <div style="font-size:11px;text-transform:uppercase;letter-spacing:1.2px;color:var(--text-secondary);margin-bottom:6px">Workspace Disk</div>
+        <div style="font-size:28px;font-weight:700;color:var(--accent-amber)" id="adminDiskWs">—</div>
+        <div style="font-size:12px;color:var(--text-secondary);margin-top:4px">workspace/</div>
+      </div>
+      <div style="background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:12px;padding:16px">
+        <div style="font-size:11px;text-transform:uppercase;letter-spacing:1.2px;color:var(--text-secondary);margin-bottom:6px">Sessions Disk</div>
+        <div style="font-size:28px;font-weight:700;color:var(--accent-pink)" id="adminDiskSess">—</div>
+        <div style="font-size:12px;color:var(--text-secondary);margin-top:4px">sessions/</div>
+      </div>
+      <div style="background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:12px;padding:16px">
+        <div style="font-size:11px;text-transform:uppercase;letter-spacing:1.2px;color:var(--text-secondary);margin-bottom:6px">Neural Disk</div>
+        <div style="font-size:28px;font-weight:700;color:var(--accent-cyan)" id="adminDiskNeural">—</div>
+        <div style="font-size:12px;color:var(--text-secondary);margin-top:4px">neuralmemory/</div>
+      </div>
+    </div>
+
+    <!-- Cache key list -->
+    <div style="background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:12px;padding:16px;margin-bottom:16px">
+      <div style="font-size:12px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px">Warm Cache Keys</div>
+      <div id="adminCacheList" style="display:flex;flex-wrap:wrap;gap:6px;min-height:24px">
+        <span style="color:var(--text-muted);font-size:12px">Loading…</span>
+      </div>
+    </div>
+
+    <!-- Actions -->
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+      <button onclick="adminClearCache()" id="adminClearBtn"
+        style="padding:10px 24px;background:linear-gradient(135deg,#ef4444,#f59e0b);border:none;border-radius:10px;color:#fff;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;transition:opacity .2s">
+        🗑️ Clear All Cache
+      </button>
+      <button onclick="loadAdminStats()"
+        style="padding:10px 24px;background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:10px;color:var(--text-primary);font-family:inherit;font-size:13px;font-weight:500;cursor:pointer;transition:all .2s">
+        🔄 Refresh
+      </button>
+      <span id="adminActionMsg" style="display:none;font-size:13px;font-weight:500"></span>
+    </div>
+  </div>
+
+  <div class="section fade-in" style="margin-top:24px">
+    <div class="section-title">🔒 Security</div>
+    <p class="section-desc">Change your dashboard login password.</p>
+    <div style="max-width:400px;display:flex;flex-direction:column;gap:12px;margin-top:16px">
+      <div>
+        <label style="display:block;font-size:12px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Current Password</label>
+        <input type="password" id="sec-current" placeholder="••••••••"
+          style="width:100%;padding:10px 14px;background:rgba(255,255,255,.05);border:1px solid var(--glass-border);border-radius:10px;color:var(--text-primary);font-family:inherit;font-size:14px;outline:none">
+      </div>
+      <div>
+        <label style="display:block;font-size:12px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">New Password</label>
+        <input type="password" id="sec-new" placeholder="••••••••"
+          style="width:100%;padding:10px 14px;background:rgba(255,255,255,.05);border:1px solid var(--glass-border);border-radius:10px;color:var(--text-primary);font-family:inherit;font-size:14px;outline:none">
+      </div>
+      <div>
+        <label style="display:block;font-size:12px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Confirm New Password</label>
+        <input type="password" id="sec-confirm" placeholder="••••••••"
+          style="width:100%;padding:10px 14px;background:rgba(255,255,255,.05);border:1px solid var(--glass-border);border-radius:10px;color:var(--text-primary);font-family:inherit;font-size:14px;outline:none">
+      </div>
+      <button onclick="changePassword()"
+        style="padding:10px 20px;background:linear-gradient(135deg,#06b6d4,#8b5cf6);border:none;border-radius:10px;color:#fff;font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;align-self:flex-start">
+        Change Password
+      </button>
+      <div id="sec-msg" style="display:none;font-size:13px;padding:10px 14px;border-radius:8px"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+function changePassword(){
+  var cur=document.getElementById('sec-current').value;
+  var nw=document.getElementById('sec-new').value;
+  var conf=document.getElementById('sec-confirm').value;
+  var msg=document.getElementById('sec-msg');
+  msg.style.display='none';
+  if(!cur||!nw||!conf){showSecMsg('Please fill in all fields.','error');return}
+  if(nw!==conf){showSecMsg('New passwords do not match.','error');return}
+  if(nw.length<6){showSecMsg('Password must be at least 6 characters.','error');return}
+  fetch('/api/auth/change-password',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({currentPassword:cur,newPassword:nw})})
+    .then(function(r){return r.json()})
+    .then(function(d){
+      if(d.ok){
+        showSecMsg('Password changed successfully!','success');
+        document.getElementById('sec-current').value='';
+        document.getElementById('sec-new').value='';
+        document.getElementById('sec-confirm').value='';
+      } else {
+        showSecMsg(d.error||'Failed to change password.','error');
+      }
+    }).catch(function(){showSecMsg('Network error.','error')});
+}
+function showSecMsg(text,type){
+  var msg=document.getElementById('sec-msg');
+  msg.textContent=text;
+  msg.style.display='block';
+  if(type==='success'){msg.style.background='rgba(16,185,129,.12)';msg.style.border='1px solid rgba(16,185,129,.3)';msg.style.color='#10b981'}
+  else{msg.style.background='rgba(239,68,68,.12)';msg.style.border='1px solid rgba(239,68,68,.3)';msg.style.color='#ef4444'}
+}
+var allModels=[],currentSort={key:'prompt',asc:true},activeProviders=new Set(),taskAssignments={},openDropdownId=null,modelGroups=[];
+var CONFIGURED=[{value:'anthropic/claude-opus-4-6',label:'Claude Opus 4.6 — Claude Direct (Subscription)'},{value:'anthropic/claude-sonnet-4-6',label:'Claude Sonnet 4.6 — Claude Direct (Subscription)'},{value:'openai-codex/gpt-5.3-codex',label:'GPT-5.3 Codex — OpenAI Codex (Subscription)'},{value:'openrouter/moonshotai/kimi-k2.5',label:'Kimi K2.5 — OpenRouter ($0.23/$3.00)'},{value:'openrouter/qwen/qwen3-next-80b-a3b-instruct:free',label:'Qwen3 Next 80B — OpenRouter (FREE)'},{value:'ollama/llama3.2',label:'Llama 3.2 3B — Ollama Local (FREE)'}];
+var TASKS=[{id:'primary',name:'Primary (Main Chat)',icon:'💬',desc:'Main conversation model.',default:'anthropic/claude-opus-4-6',defaultLabel:'Claude Opus 4.6 — Claude Direct (Subscription)'},{id:'coding',name:'Coding & Development',icon:'💻',desc:'Code generation, debugging.',default:'anthropic/claude-opus-4-6',defaultLabel:'Claude Opus 4.6 — Claude Direct (Subscription)'},{id:'research',name:'Research & Web Search',icon:'🔍',desc:'Research, summarization.',default:'anthropic/claude-sonnet-4-6',defaultLabel:'Claude Sonnet 4.6 — Claude Direct (Subscription)'},{id:'data',name:'Data & Analysis',icon:'📊',desc:'Database queries, calculations.',default:'anthropic/claude-opus-4-6',defaultLabel:'Claude Opus 4.6 — Claude Direct (Subscription)'},{id:'creative',name:'Creative & Writing',icon:'✍️',desc:'Content creation.',default:'anthropic/claude-sonnet-4-6',defaultLabel:'Claude Sonnet 4.6 — Claude Direct (Subscription)'},{id:'maintenance',name:'Maintenance & Cleanup',icon:'🧹',desc:'Nightly runs, routine tasks.',default:'anthropic/claude-sonnet-4-6',defaultLabel:'Claude Sonnet 4.6 — Claude Direct (Subscription)'},{id:'fallback',name:'Fallback (Emergency)',icon:'🆘',desc:'When primary providers are down.',default:'openrouter/qwen/qwen3-next-80b-a3b-instruct:free',defaultLabel:'Qwen3 Next 80B — OpenRouter (FREE)'}];
+function formatPrice(p){var n=parseFloat(p)*1e6;if(n===0)return'$0';if(n<.01)return'<$0.01';if(n<1)return'$'+n.toFixed(2);return'$'+n.toFixed(2)}
+function priceClass(p){var n=parseFloat(p)*1e6;if(n===0)return'price-free';if(n<1)return'price-cheap';if(n<5)return'price-mid';return'price-high'}
+function formatCtx(n){if(n>=1e6)return(n/1e6).toFixed(1)+'M';if(n>=1e3)return(n/1e3).toFixed(0)+'K';return n}
+function getProvider(id){return id.split('/')[0]}
+function escapeHtml(s){var d=document.createElement('div');d.textContent=s;return d.innerHTML}
+function serviceTag(m){if(m.startsWith('anthropic/'))return'Claude Direct';if(m.startsWith('openai-codex/'))return'OpenAI Codex';if(m.startsWith('openai/'))return'OpenAI';if(m.startsWith('openrouter/'))return'OpenRouter';if(m.startsWith('ollama/'))return'Ollama Local';return'Unknown'}
+function buildModelGroups(){var free=allModels.filter(function(m){return parseFloat(m.pricing&&m.pricing.prompt||'1')===0}).sort(function(a,b){return(b.context_length||0)-(a.context_length||0)});var cheap=allModels.filter(function(m){var p=parseFloat(m.pricing&&m.pricing.prompt||'0');return p>0&&p*1e6<1}).sort(function(a,b){return parseFloat(a.pricing.prompt||'0')-parseFloat(b.pricing.prompt||'0')});var mid=allModels.filter(function(m){var p=parseFloat(m.pricing&&m.pricing.prompt||'0');return p*1e6>=1&&p*1e6<5}).sort(function(a,b){return parseFloat(a.pricing.prompt||'0')-parseFloat(b.pricing.prompt||'0')});var premium=allModels.filter(function(m){var p=parseFloat(m.pricing&&m.pricing.prompt||'0');return p*1e6>=5}).sort(function(a,b){return parseFloat(a.pricing.prompt||'0')-parseFloat(b.pricing.prompt||'0')});modelGroups=[{label:'⭐ Configured',items:CONFIGURED.map(function(m){return{value:m.value,label:m.label}})},{label:'🆓 Free',items:free.map(function(m){return{value:'openrouter/'+m.id,label:m.id+' ('+formatCtx(m.context_length||0)+' ctx)'}})},{label:'💰 Cheap',items:cheap.slice(0,40).map(function(m){return{value:'openrouter/'+m.id,label:m.id+' ('+formatPrice(m.pricing.prompt||'0')+'/'+formatPrice(m.pricing.completion||'0')+')'}})},{label:'⚡ Mid',items:mid.slice(0,30).map(function(m){return{value:'openrouter/'+m.id,label:m.id+' ('+formatPrice(m.pricing.prompt||'0')+'/'+formatPrice(m.pricing.completion||'0')+')'}})},{label:'👑 Premium',items:premium.slice(0,25).map(function(m){return{value:'openrouter/'+m.id,label:m.id+' ('+formatPrice(m.pricing.prompt||'0')+'/'+formatPrice(m.pricing.completion||'0')+')'}})}]}
+function findLabel(value){for(var i=0;i<modelGroups.length;i++){var f=modelGroups[i].items.find(function(x){return x.value===value});if(f)return f.label}return value}
+function toggleDropdown(taskId){if(openDropdownId&&openDropdownId!==taskId){var old=document.getElementById('dd-'+openDropdownId);if(old){old.classList.remove('open');old.closest('.task-card').style.zIndex='1'}}var dd=document.getElementById('dd-'+taskId);var isOpen=dd.classList.toggle('open');var card=dd.closest('.task-card');card.style.zIndex=isOpen?'50':'1';openDropdownId=isOpen?taskId:null;if(isOpen){var fi=document.getElementById('filter-'+taskId);fi.value='';fi.focus();renderDropdownList(taskId,'')}}
+function renderDropdownList(taskId,query){var selected=document.querySelector('#ss-'+taskId+' .search-select-input').dataset.value;var q=query.toLowerCase();var html='<div class="search-select-option'+((!selected)?' selected':'')+'" data-value="" data-label="— Use Default —" data-task="'+taskId+'">— Use Default —</div>';for(var i=0;i<modelGroups.length;i++){var g=modelGroups[i];var filtered=q?g.items.filter(function(x){return x.label.toLowerCase().includes(q)||x.value.toLowerCase().includes(q)}):g.items;if(!filtered.length)continue;html+='<div class="search-select-group">'+escapeHtml(g.label)+'</div>';for(var j=0;j<filtered.length;j++){var item=filtered[j];var sel=item.value===selected?' selected':'';html+='<div class="search-select-option'+sel+'" data-value="'+escapeHtml(item.value)+'" data-label="'+escapeHtml(item.label)+'" data-task="'+taskId+'">'+escapeHtml(item.label)+'</div>'}}var list=document.getElementById('list-'+taskId);list.innerHTML=html;list.onclick=function(e){var opt=e.target.closest('.search-select-option');if(!opt)return;selectModel(opt.dataset.task||taskId,opt.dataset.value||'',opt.dataset.label||'— Use Default —')}}
+function filterDropdown(taskId){renderDropdownList(taskId,document.getElementById('filter-'+taskId).value)}
+function selectModel(taskId,value,label){var input=document.querySelector('#ss-'+taskId+' .search-select-input');input.value=label;input.dataset.value=value;document.getElementById('dd-'+taskId).classList.remove('open');openDropdownId=null;taskAssignments[taskId]=value;onTaskChange(taskId)}
+document.addEventListener('click',function(e){if(openDropdownId&&!e.target.closest('.search-select')){var dd=document.getElementById('dd-'+openDropdownId);if(dd){dd.classList.remove('open');dd.closest('.task-card').style.zIndex='1'}openDropdownId=null}});
+async function loadModels(){try{var res=await fetch('/api/settings/models');var data=await res.json();allModels=data.models||[];document.getElementById('totalModels').textContent=allModels.length;document.getElementById('freeModels').textContent=allModels.filter(function(m){return parseFloat(m.pricing&&m.pricing.prompt||'1')===0}).length;var _bal=data.balance;var _balText='—';if(typeof _bal==='number'){_balText='$'+_bal.toFixed(2)}else if(_bal&&typeof _bal==='object'&&_bal.note==='usage_only'){_balText='(usage only)'}else if(_bal&&typeof _bal==='object'&&typeof _bal.total_credits==='number'){_balText='$'+(_bal.total_credits-(_bal.total_usage||0)).toFixed(2)}document.getElementById('orBalance').textContent=_balText;document.getElementById('primaryModel').textContent='Opus 4.6';var providers=[...new Set(allModels.map(function(m){return getProvider(m.id)}))].sort();document.getElementById('providerFilter').innerHTML=providers.slice(0,20).map(function(p){return'<button class="filter-btn" data-provider="'+p+'" onclick="toggleProvider(\''+p+'\')">'+p+'</button>'}).join('');buildModelGroups();renderModels();renderTasks()}catch(e){document.getElementById('modelCount').textContent='Error: '+e.message}}
+async function loadAssignments(){try{var res=await fetch('/api/settings/assignments');taskAssignments=(await res.json()).assignments||{}}catch(e){}}
+function renderModels(){var filtered=allModels.slice();var query=document.getElementById('searchInput').value.toLowerCase();if(query)filtered=filtered.filter(function(m){return m.id.toLowerCase().includes(query)||(m.name||'').toLowerCase().includes(query)});if(activeProviders.size>0)filtered=filtered.filter(function(m){return activeProviders.has(getProvider(m.id))});filtered.sort(function(a,b){var va,vb;if(currentSort.key==='name'){va=a.id;vb=b.id}else if(currentSort.key==='prompt'){va=parseFloat(a.pricing&&a.pricing.prompt||'999');vb=parseFloat(b.pricing&&b.pricing.prompt||'999')}else if(currentSort.key==='completion'){va=parseFloat(a.pricing&&a.pricing.completion||'999');vb=parseFloat(b.pricing&&b.pricing.completion||'999')}else if(currentSort.key==='context'){va=a.context_length||0;vb=b.context_length||0}return currentSort.asc?(va<vb?-1:va>vb?1:0):(va>vb?-1:va<vb?1:0)});document.getElementById('modelCount').textContent='Showing '+filtered.length+' of '+allModels.length+' models';document.getElementById('modelTable').innerHTML=filtered.slice(0,200).map(function(m){var p=m.pricing||{};var isFree=parseFloat(p.prompt||'1')===0&&parseFloat(p.completion||'1')===0;return'<tr><td><div class="model-name">'+escapeHtml(m.id)+'</div></td><td><span class="'+priceClass(p.prompt||'0')+'">'+formatPrice(p.prompt||'0')+'</span></td><td><span class="'+priceClass(p.completion||'0')+'">'+formatPrice(p.completion||'0')+'</span></td><td><span class="ctx-badge">'+formatCtx(m.context_length||0)+'</span></td><td>'+(isFree?'<span class="badge badge-free">FREE</span>':'')+'</td><td><button class="test-model-btn" onclick="testModel(\'openrouter/'+escapeHtml(m.id)+'\',this)" title="Test this model">🧪</button></td></tr>'}).join('')||'<tr><td colspan="6" style="text-align:center;padding:20px">No models found</td></tr>'}
+function renderTasks(){document.getElementById('taskGrid').innerHTML=TASKS.map(function(t){var current=taskAssignments[t.id]||'';var displayLabel=current?findLabel(current):'— Use Default —';var defaultInfo='<span style="color:var(--accent-cyan)">'+escapeHtml(t.defaultLabel)+'</span>';return'<div class="task-card"><div class="task-header"><span class="task-name">'+t.name+'</span><span class="task-icon">'+t.icon+'</span></div><div class="task-desc">'+t.desc+'</div><div class="search-select" id="ss-'+t.id+'"><input type="text" class="search-select-input" readonly value="'+escapeHtml(displayLabel)+'" onclick="toggleDropdown(\''+t.id+'\')" data-value="'+(current||'')+'"><div class="search-select-dropdown" id="dd-'+t.id+'"><input type="text" class="search-select-filter" id="filter-'+t.id+'" placeholder="🔍 Search models..." oninput="filterDropdown(\''+t.id+'\')"><div class="search-select-list" id="list-'+t.id+'"></div></div></div><div class="task-cost" id="cost-'+t.id+'">'+(current?'🤖 '+escapeHtml(current)+' — '+serviceTag(current):'📌 Default: '+defaultInfo)+'</div></div>'}).join('')}
+function onTaskChange(taskId){var model=taskAssignments[taskId]||'';var costDiv=document.getElementById('cost-'+taskId);var taskDef=TASKS.find(function(t){return t.id===taskId});if(model){var svc=serviceTag(model);var m=allModels.find(function(x){return'openrouter/'+x.id===model})||allModels.find(function(x){return x.id===model});if(m&&m.pricing){costDiv.innerHTML='🤖 '+escapeHtml(model)+' — <span class="price">'+svc+' • '+formatPrice(m.pricing.prompt||'0')+'/'+formatPrice(m.pricing.completion||'0')+'/M</span>'}else{costDiv.innerHTML='🤖 '+escapeHtml(model)+' — <span class="price">'+svc+'</span>'}}else{costDiv.innerHTML='📌 Default: <span style="color:var(--accent-cyan)">'+escapeHtml(taskDef?taskDef.defaultLabel:'')+'</span>'}}
+async function saveAssignments(){var btn=document.getElementById('saveBtn'),status=document.getElementById('saveStatus');btn.disabled=true;try{var res=await fetch('/api/settings/assignments',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({assignments:taskAssignments})});var data=await res.json();if(data.ok){status.style.display='inline';setTimeout(function(){status.style.display='none'},3000)}}catch(e){alert('Error: '+e.message)}btn.disabled=false}
+function filterModels(){renderModels()}
+function toggleProvider(p){if(activeProviders.has(p)){activeProviders.delete(p);document.querySelector('[data-provider="'+p+'"]').classList.remove('active')}else{activeProviders.add(p);document.querySelector('[data-provider="'+p+'"]').classList.add('active')}renderModels()}
+function sortModels(key){if(currentSort.key===key)currentSort.asc=!currentSort.asc;else{currentSort.key=key;currentSort.asc=true}renderModels()}
+async function loadBudget(){try{var res=await fetch('/api/settings/budget');var b=await res.json();document.getElementById('budgetDaily').value=b.dailyLimit||5;document.getElementById('budgetWeekly').value=b.weeklyLimit||20;document.getElementById('budgetAlertEnabled').checked=b.alertEnabled!==false;var cs=await fetch('/api/costs/summary');var c=await cs.json();if(c.budget){renderBudgetProgress(c)}}catch(e){}}
+function renderBudgetProgress(c){var b=c.budget;var dp=b.dailyPercentUsed||0;var wp=b.weeklyPercentUsed||0;function barCol(p){if(p>=100)return'#ef4444';if(p>=80)return'#f59e0b';return'#10b981'}
+var html='<div style="margin-bottom:12px"><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px"><span style="color:var(--text-secondary)">Daily: $'+(c.totalToday||0).toFixed(4)+' / $'+b.dailyLimit.toFixed(2)+'</span><span style="color:'+barCol(dp)+'">'+dp.toFixed(1)+'%</span></div><div style="height:8px;background:rgba(255,255,255,0.05);border-radius:4px;overflow:hidden"><div style="height:100%;width:'+Math.min(dp,100)+'%;background:'+barCol(dp)+';border-radius:4px;transition:width 0.5s"></div></div></div>';
+html+='<div><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px"><span style="color:var(--text-secondary)">Weekly: $'+(c.totalSevenDays||0).toFixed(4)+' / $'+b.weeklyLimit.toFixed(2)+'</span><span style="color:'+barCol(wp)+'">'+wp.toFixed(1)+'%</span></div><div style="height:8px;background:rgba(255,255,255,0.05);border-radius:4px;overflow:hidden"><div style="height:100%;width:'+Math.min(wp,100)+'%;background:'+barCol(wp)+';border-radius:4px;transition:width 0.5s"></div></div></div>';
+document.getElementById('budgetProgress').innerHTML=html}
+async function saveBudget(){try{var res=await fetch('/api/settings/budget',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({dailyLimit:parseFloat(document.getElementById('budgetDaily').value)||5,weeklyLimit:parseFloat(document.getElementById('budgetWeekly').value)||20,alertEnabled:document.getElementById('budgetAlertEnabled').checked})});var d=await res.json();if(d.ok){var s=document.getElementById('budgetSaveStatus');s.style.display='inline';setTimeout(function(){s.style.display='none'},3000);loadBudget()}}catch(e){alert('Error: '+e.message)}}
+loadBudget();
+async function testModel(modelId,btn){var origText=btn.textContent;btn.textContent='⏳';btn.disabled=true;try{var res=await fetch('/api/settings/test-model',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:modelId})});var d=await res.json();if(d.error){showTestToast('❌ Error: '+d.error,'error')}else{showTestToast('🧪 <b>'+escapeHtml(modelId.split('/').pop())+'</b><br>💬 '+escapeHtml(d.response)+'<br>⏱️ '+d.latencyMs+'ms · 📥 '+d.inputTokens+' → 📤 '+d.outputTokens+' tokens · 💰 $'+(d.estimatedCost||0).toFixed(6),'success')}}catch(e){showTestToast('❌ '+e.message,'error')}btn.textContent=origText;btn.disabled=false}
+function showTestToast(html,type){var t=document.createElement('div');t.className='test-toast test-toast-'+type;t.innerHTML=html+'<span class="test-toast-close" onclick="this.parentElement.remove()">✕</span>';document.body.appendChild(t);setTimeout(function(){t.style.opacity='0';setTimeout(function(){t.remove()},500)},8000)}
+loadAssignments().then(loadModels);
+
+// Admin Controls
+async function loadAdminStats(){
+  try{
+    var r=await fetch('/api/admin/cache-stats');
+    var d=await r.json();
+    document.getElementById('adminCacheKeys').textContent=d.cacheKeys||0;
+    document.getElementById('adminProcMem').textContent=d.processMem||'?';
+    document.getElementById('adminUptime').textContent=d.uptime||0;
+    document.getElementById('adminDiskWs').textContent=(d.disk&&d.disk.workspace)||'?';
+    document.getElementById('adminDiskSess').textContent=(d.disk&&d.disk.sessions)||'?';
+    document.getElementById('adminDiskNeural').textContent=(d.disk&&d.disk.neural)||'?';
+    // Render key pills
+    var keys=d.keys||[];
+    if(keys.length===0){
+      document.getElementById('adminCacheList').innerHTML='<span style="color:var(--text-muted);font-size:12px">Cache is empty</span>';
+    } else {
+      document.getElementById('adminCacheList').innerHTML=keys.map(function(k){
+        var col=k.ttlRemaining<5?'rgba(239,68,68,.25)':k.ttlRemaining<15?'rgba(245,158,11,.2)':'rgba(6,182,212,.15)';
+        return '<span style="background:'+col+';border:1px solid rgba(255,255,255,.1);border-radius:6px;padding:3px 8px;font-size:11px;font-family:monospace;color:var(--text-primary)" title="TTL: '+k.ttlRemaining+'s remaining">'+escapeHtml(k.key)+'</span>';
+      }).join('');
+    }
+  }catch(e){
+    document.getElementById('adminCacheList').innerHTML='<span style="color:#ef4444;font-size:12px">Error: '+escapeHtml(e.message)+'</span>';
+  }
+}
+async function adminClearCache(){
+  var btn=document.getElementById('adminClearBtn');
+  var msg=document.getElementById('adminActionMsg');
+  btn.disabled=true;btn.style.opacity='0.5';
+  try{
+    var r=await fetch('/api/admin/clear-cache',{method:'POST',headers:{'Content-Type':'application/json'}});
+    var d=await r.json();
+    if(d.ok){
+      msg.textContent='✅ Cleared '+d.keysCleared+' keys';
+      msg.style.color='var(--accent-emerald)';
+      msg.style.display='inline';
+      setTimeout(function(){msg.style.display='none'},4000);
+      loadAdminStats();
+    }
+  }catch(e){
+    msg.textContent='❌ '+e.message;
+    msg.style.color='#ef4444';
+    msg.style.display='inline';
+    setTimeout(function(){msg.style.display='none'},4000);
+  }
+  btn.disabled=false;btn.style.opacity='1';
+}
+loadAdminStats();
+setInterval(loadAdminStats,30000);
+function loadCostsSummary(){
+  fetch('/api/costs/summary').then(function(r){return r.json()}).then(function(d){
+    document.getElementById('costToday').textContent='$'+(d.totalToday||0).toFixed(4);
+    document.getElementById('costWeek').textContent='$'+(d.totalSevenDays||0).toFixed(4);
+  }).catch(function(){
+    // silent fail — stale values remain
+  });
+}
+loadCostsSummary();
+setInterval(loadCostsSummary, 30000);
+// Also refresh budget display every 30s
+setInterval(loadBudget, 30000);
+
+// Provider Health
+function loadHealth(){
+  fetch('/api/health/providers').then(function(r){return r.json()}).then(function(d){
+    ['anthropic','openai-codex','openrouter','ollama'].forEach(function(p){
+      var dot=document.getElementById('hd-'+p);
+      var meta=document.getElementById('hm-'+p);
+      var info=d[p];
+      if(!info){dot.className='health-dot down';meta.textContent='No data';return}
+      dot.className='health-dot '+(info.status==='ok'?'ok':'down');
+      var txt=info.status==='ok'?'✓ Online':'✗ Unreachable';
+      txt+=' · '+info.latencyMs+'ms';
+      if(p==='ollama'&&info.models!=null) txt+=' · '+info.models+' models';
+      meta.textContent=txt;
+    });
+    if(d.checkedAt){var t=new Date(d.checkedAt);document.getElementById('healthCheckedAt').textContent='Last checked: '+t.toLocaleTimeString()}
+  }).catch(function(){});
+}
+loadHealth();
+setInterval(loadHealth,60000);
+
+// Network & Tunnel Status
+async function loadNetworkStatus(){
+  try{
+    var r=await fetch('/api/network/status');
+    var d=await r.json();
+    function setCheck(id,ok,meta){
+      var dot=document.getElementById('nd-'+id);
+      var metaEl=document.getElementById('nm-'+id);
+      dot.className='health-dot '+(ok?'ok':'down');
+      metaEl.textContent=meta;
+    }
+    // Tunnel
+    var tOk=d.tunnel&&d.tunnel.active==='active';
+    setCheck('tunnel',tOk,tOk?'✓ Active':'✗ Not running');
+    // Local port
+    var pOk=d.port&&d.port.listening;
+    setCheck('port',pOk,pOk?'✓ Listening':'✗ Not listening');
+    // arc.net.pk
+    var aOk=d.arc&&d.arc.httpStatus&&d.arc.httpStatus>=200&&d.arc.httpStatus<400;
+    setCheck('arc',aOk,(d.arc&&d.arc.httpStatus)?'HTTP '+d.arc.httpStatus+' · '+(d.arc.latencyMs||'?')+'ms':'✗ Unreachable');
+    // dashboard URL
+    var dashOk=d.dashboard&&d.dashboard.httpStatus&&d.dashboard.httpStatus>=200&&d.dashboard.httpStatus<400;
+    setCheck('dashboard',dashOk,(d.dashboard&&d.dashboard.httpStatus)?'HTTP '+d.dashboard.httpStatus+' · '+(d.dashboard.latencyMs||'?')+'ms':'✗ Unreachable');
+    // Tunnel ID
+    if(d.tunnelId) document.getElementById('networkTunnelId').textContent='Tunnel: '+d.tunnelId;
+    if(d.checkedAt){var t=new Date(d.checkedAt);document.getElementById('networkCheckedAt').textContent='Last checked: '+t.toLocaleTimeString()+' — refreshes every 30s'}
+  }catch(e){
+    ['tunnel','port','arc','dashboard'].forEach(function(id){
+      document.getElementById('nd-'+id).className='health-dot';
+      document.getElementById('nm-'+id).textContent='Error: '+e.message;
+    });
+  }
+}
+loadNetworkStatus();
+setInterval(loadNetworkStatus,30000);
+</script>
+</body>
+</html>

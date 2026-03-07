@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>📋 Clawdbot Logs</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg-primary:#0a0e17;
+  --bg-secondary:#0f1420;
+  --glass-bg:rgba(255,255,255,0.03);
+  --glass-border:rgba(255,255,255,0.08);
+  --glass-highlight:rgba(255,255,255,0.12);
+  --text-primary:#f1f5f9;
+  --text-secondary:#94a3b8;
+  --text-muted:#64748b;
+  --accent-cyan:#06b6d4;
+  --accent-purple:#8b5cf6;
+  --accent-pink:#ec4899;
+  --accent-emerald:#10b981;
+  --accent-amber:#f59e0b;
+  --accent-red:#ef4444;
+  --gradient-main:linear-gradient(135deg,#06b6d4,#8b5cf6,#ec4899);
+}
+body{
+  background:var(--bg-primary);
+  color:var(--text-primary);
+  font-family:'Inter',sans-serif;
+  min-height:100vh;
+  overflow-x:hidden;
+}
+body::before{
+  content:'';position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;pointer-events:none;
+  background:radial-gradient(ellipse at 20% 50%,rgba(6,182,212,0.08) 0%,transparent 50%),
+             radial-gradient(ellipse at 80% 20%,rgba(139,92,246,0.06) 0%,transparent 50%),
+             radial-gradient(ellipse at 50% 80%,rgba(236,72,153,0.05) 0%,transparent 50%);
+  animation:bgShift 20s ease-in-out infinite alternate;
+}
+@keyframes bgShift{
+  0%{opacity:.7;transform:scale(1)}
+  100%{opacity:1;transform:scale(1.1)}
+}
+.wrapper{position:relative;z-index:1;max-width:1200px;margin:0 auto;padding:20px}
+.header{
+  background:var(--glass-bg);
+  border:1px solid var(--glass-border);
+  border-radius:16px;
+  padding:20px 28px;
+  margin-bottom:20px;
+  backdrop-filter:blur(20px);
+  display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;
+  position:relative;
+}
+.header::after{
+  content:'';position:absolute;bottom:0;left:24px;right:24px;height:1px;
+  background:var(--gradient-main);opacity:.4;
+}
+.header h1{font-size:1.4rem;font-weight:700}
+.header-nav{display:flex;gap:16px;flex-wrap:wrap}
+.header-nav a{
+  color:var(--text-secondary);text-decoration:none;font-size:.85rem;font-weight:500;
+  transition:color .2s;
+}
+.header-nav a:hover{color:var(--accent-cyan)}
+
+.controls{
+  background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:12px;
+  padding:16px 20px;margin-bottom:16px;backdrop-filter:blur(20px);
+  display:flex;align-items:center;gap:16px;flex-wrap:wrap;
+}
+.service-tabs{display:flex;gap:6px;flex-wrap:wrap}
+.service-tab{
+  padding:6px 14px;border-radius:8px;font-size:.8rem;font-weight:500;
+  cursor:pointer;border:1px solid var(--glass-border);
+  background:transparent;color:var(--text-secondary);transition:all .2s;
+}
+.service-tab:hover{border-color:var(--accent-cyan);color:var(--text-primary)}
+.service-tab.active{
+  background:rgba(6,182,212,0.15);border-color:var(--accent-cyan);color:var(--accent-cyan);
+}
+.controls-right{margin-left:auto;display:flex;align-items:center;gap:14px}
+.line-select{
+  background:var(--bg-secondary);border:1px solid var(--glass-border);color:var(--text-primary);
+  padding:5px 10px;border-radius:6px;font-size:.8rem;font-family:'Inter',sans-serif;
+}
+.auto-toggle{
+  display:flex;align-items:center;gap:6px;font-size:.8rem;color:var(--text-secondary);cursor:pointer;
+}
+.auto-toggle input{accent-color:var(--accent-cyan)}
+.refresh-btn{
+  padding:5px 12px;border-radius:6px;font-size:.8rem;font-weight:500;cursor:pointer;
+  background:rgba(6,182,212,0.15);border:1px solid var(--accent-cyan);color:var(--accent-cyan);
+  transition:all .2s;
+}
+.refresh-btn:hover{background:rgba(6,182,212,0.3)}
+
+.log-container{
+  background:rgba(0,0,0,0.4);border:1px solid var(--glass-border);border-radius:12px;
+  padding:16px;min-height:500px;max-height:75vh;overflow-y:auto;
+  font-family:'JetBrains Mono','Fira Code','Cascadia Code',monospace;
+  font-size:.78rem;line-height:1.7;
+  backdrop-filter:blur(10px);
+}
+.log-line{white-space:pre-wrap;word-break:break-all;padding:1px 0}
+.log-line.error{color:var(--accent-red)}
+.log-line.warn{color:var(--accent-amber)}
+.log-line.info{color:var(--text-secondary)}
+.log-status{
+  text-align:center;padding:40px;color:var(--text-muted);font-size:.9rem;
+}
+.log-meta{
+  display:flex;justify-content:space-between;margin-top:8px;
+  font-size:.7rem;color:var(--text-muted);
+}
+/* ── Keyword filter row ───────────────────────────────────── */
+.filter-row{
+  display:flex;align-items:center;gap:10px;
+  margin-bottom:10px;
+}
+.filter-input{
+  flex:1;
+  padding:7px 14px;
+  background:rgba(0,0,0,0.35);
+  border:1px solid var(--glass-border);
+  border-radius:8px;
+  color:var(--text-primary);
+  font-family:'JetBrains Mono','Fira Code',monospace;
+  font-size:.78rem;
+  outline:none;
+  transition:border-color .2s;
+}
+.filter-input::placeholder{color:var(--text-muted)}
+.filter-input:focus{border-color:var(--accent-cyan);box-shadow:0 0 0 2px rgba(6,182,212,0.15)}
+.filter-badge{
+  font-size:.7rem;font-weight:600;padding:4px 10px;border-radius:6px;
+  background:rgba(6,182,212,0.12);border:1px solid rgba(6,182,212,0.25);
+  color:var(--accent-cyan);white-space:nowrap;
+  display:none;
+}
+.filter-clear{
+  padding:6px 10px;border-radius:6px;font-size:.75rem;font-weight:500;cursor:pointer;
+  background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.3);
+  color:#f87171;transition:all .2s;display:none;
+}
+.filter-clear:hover{background:rgba(239,68,68,0.25)}
+.log-line mark{
+  background:rgba(245,158,11,0.35);
+  color:var(--accent-amber);
+  border-radius:2px;
+  padding:0 1px;
+}
+/* ── Service status dots ─────────────────────────────────────── */
+.svc-dot{
+  display:inline-block;width:6px;height:6px;border-radius:50%;
+  background:var(--text-muted);margin-right:5px;vertical-align:middle;
+  transition:background .4s,box-shadow .4s;flex-shrink:0;
+}
+.svc-dot.active{background:var(--accent-emerald);box-shadow:0 0 5px rgba(16,185,129,0.7)}
+.svc-dot.inactive{background:var(--accent-red);box-shadow:0 0 4px rgba(239,68,68,0.5)}
+.svc-dot.unknown{background:var(--text-muted)}
+@media(max-width:640px){
+  .wrapper{padding:12px}
+  .header{padding:14px 18px}
+  .controls{flex-direction:column;align-items:stretch}
+  .controls-right{margin-left:0;justify-content:space-between}
+  .log-container{font-size:.7rem;max-height:60vh}
+  .filter-row{flex-wrap:wrap}
+}
+</style>
+</head>
+<body>
+<div class="wrapper">
+  <div class="header">
+    <h1>📋 Live Logs</h1>
+    <div class="header-nav">
+      <a href="/">📊 Dashboard</a>
+      <a href="/mail.html">📧 Mail</a>
+      <a href="/agents.html">🎛️ Agents</a>
+      <a href="neural.html">🧠 Neural</a>
+      <a href="/settings.html">⚙️ Settings</a>
+      <a href="/identity.html">🧠 Identity</a>
+      <a href="/logout" style="color: var(--accent-red, #ef4444);">⏏ Logout</a>
+    </div>
+  </div>
+
+  <div class="controls">
+    <div class="service-tabs">
+      <div class="service-tab active" data-svc="openclaw" onclick="selectService('openclaw')"><span class="svc-dot unknown" id="dot-openclaw"></span>openclaw</div>
+      <div class="service-tab" data-svc="clawdbot-dashboard" onclick="selectService('clawdbot-dashboard')"><span class="svc-dot unknown" id="dot-clawdbot-dashboard"></span>dashboard</div>
+      <div class="service-tab" data-svc="cloudflared-dashboard" onclick="selectService('cloudflared-dashboard')"><span class="svc-dot unknown" id="dot-cloudflared-dashboard"></span>cloudflared</div>
+      <div class="service-tab" data-svc="searxng" onclick="selectService('searxng')"><span class="svc-dot unknown" id="dot-searxng"></span>searxng</div>
+      <div class="service-tab" data-svc="ollama" onclick="selectService('ollama')"><span class="svc-dot unknown" id="dot-ollama"></span>ollama</div>
+    </div>
+    <div class="controls-right">
+      <select class="line-select" id="lineCount" onchange="fetchLogs()">
+        <option value="50">50 lines</option>
+        <option value="100">100 lines</option>
+        <option value="200">200 lines</option>
+        <option value="500">500 lines</option>
+      </select>
+      <label class="auto-toggle"><input type="checkbox" id="autoRefresh" onchange="toggleAuto()"> Auto-refresh</label>
+      <button class="refresh-btn" onclick="fetchLogs()">⟳ Refresh</button>
+    </div>
+  </div>
+
+  <!-- Keyword filter -->
+  <div class="filter-row">
+    <input class="filter-input" id="filterInput" placeholder="🔍 Filter log lines… (keyword, regex supported)" oninput="applyFilter()" onkeydown="if(event.key==='Escape'){clearFilter()}">
+    <span class="filter-badge" id="filterBadge">0 matches</span>
+    <button class="filter-clear" id="filterClear" onclick="clearFilter()">✕ Clear</button>
+  </div>
+
+  <div class="log-container" id="logOutput">
+    <div class="log-status">Select a service and click Refresh</div>
+  </div>
+  <div class="log-meta">
+    <span id="logService">—</span>
+    <span id="logTimestamp">—</span>
+  </div>
+</div>
+
+<script>
+let currentService = 'openclaw';
+let autoTimer = null;
+let rawLogLines = []; // stored lines from last fetch — re-used by filter
+
+function selectService(svc) {
+  currentService = svc;
+  document.querySelectorAll('.service-tab').forEach(t => t.classList.toggle('active', t.dataset.svc === svc));
+  fetchLogs();
+}
+
+function classifyLine(text) {
+  if (/\berr(or)?\b|failed|fatal|panic|exception/i.test(text)) return 'error';
+  if (/\bwarn(ing)?\b/i.test(text)) return 'warn';
+  return 'info';
+}
+
+function escapeHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// Highlight occurrences of `kw` inside already-HTML-escaped text.
+// isRegexMode=true → try to use kw directly as a regex (for regex-filter matches);
+// isRegexMode=false → always escape kw for literal matching.
+function highlightKeyword(escaped, kw, isRegexMode) {
+  if (!kw) return escaped;
+  try {
+    let re;
+    if (isRegexMode) {
+      // Use raw pattern for regex-mode highlighting; fall back to literal if invalid
+      try { re = new RegExp(`(${kw})`, 'gi'); }
+      catch { const s = kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); re = new RegExp(`(${s})`, 'gi'); }
+    } else {
+      const s = kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      re = new RegExp(`(${s})`, 'gi');
+    }
+    return escaped.replace(re, '<mark>$1</mark>');
+  } catch { return escaped; }
+}
+
+function renderLogs(lines, keyword) {
+  const container = document.getElementById('logOutput');
+  if (!lines.length) {
+    container.innerHTML = '<div class="log-status">No log entries found</div>';
+    updateFilterBadge(0, 0);
+    return;
+  }
+
+  const kw = (keyword || '').trim();
+  let matchCount = 0;
+  const html = [];
+
+  // Build regex once for validity check (for match counting with user regex)
+  let kwRe = null;
+  if (kw) {
+    try { kwRe = new RegExp(kw, 'i'); } catch { kwRe = null; }
+  }
+
+  for (const l of lines) {
+    if (kw) {
+      const matches = kwRe ? kwRe.test(l) : l.toLowerCase().includes(kw.toLowerCase());
+      if (!matches) continue; // hide non-matching lines
+      matchCount++;
+    }
+    const cls = classifyLine(l);
+    const escaped = escapeHtml(l);
+    const displayed = kw ? highlightKeyword(escaped, kw, !!kwRe) : escaped;
+    html.push(`<div class="log-line ${cls}">${displayed}</div>`);
+  }
+
+  if (kw && html.length === 0) {
+    container.innerHTML = `<div class="log-status">No lines match <strong style="color:var(--accent-amber)">${escapeHtml(kw)}</strong></div>`;
+  } else {
+    container.innerHTML = html.join('');
+    container.scrollTop = container.scrollHeight;
+  }
+
+  if (kw) updateFilterBadge(matchCount, lines.length);
+  else updateFilterBadge(-1, lines.length); // -1 = no filter active
+}
+
+function updateFilterBadge(matches, total) {
+  const badge = document.getElementById('filterBadge');
+  const clearBtn = document.getElementById('filterClear');
+  if (matches < 0) {
+    // No filter active
+    badge.style.display = 'none';
+    clearBtn.style.display = 'none';
+  } else {
+    badge.textContent = `${matches} / ${total} match${matches !== 1 ? 'es' : ''}`;
+    badge.style.display = 'inline';
+    clearBtn.style.display = 'inline';
+  }
+}
+
+function applyFilter() {
+  const kw = document.getElementById('filterInput').value;
+  renderLogs(rawLogLines, kw);
+}
+
+function clearFilter() {
+  document.getElementById('filterInput').value = '';
+  renderLogs(rawLogLines, '');
+}
+
+async function fetchLogs() {
+  const lines = document.getElementById('lineCount').value;
+  const container = document.getElementById('logOutput');
+  try {
+    const r = await fetch(`/api/logs/tail?service=${currentService}&lines=${lines}`, { credentials: 'same-origin' });
+    const data = await r.json();
+    if (data.error) {
+      container.innerHTML = `<div class="log-status" style="color:var(--accent-red)">${data.error}</div>`;
+      return;
+    }
+    rawLogLines = data.lines || [];
+    const kw = document.getElementById('filterInput').value;
+    renderLogs(rawLogLines, kw);
+    document.getElementById('logService').textContent = `Service: ${data.service}`;
+    document.getElementById('logTimestamp').textContent = `Fetched: ${new Date(data.timestamp).toLocaleTimeString()}`;
+  } catch(e) {
+    container.innerHTML = `<div class="log-status" style="color:var(--accent-red)">Failed to fetch logs: ${e.message}</div>`;
+  }
+}
+
+function toggleAuto() {
+  clearInterval(autoTimer);
+  autoTimer = null;
+  if (document.getElementById('autoRefresh').checked) {
+    fetchLogs();
+    autoTimer = setInterval(fetchLogs, 15000);
+  }
+}
+
+// ── Service status dots ───────────────────────────────────────
+let svcStatusTimer = null;
+
+async function loadServiceStatus() {
+  try {
+    const r = await fetch('/api/logs/services-status', { credentials: 'same-origin' });
+    if (!r.ok) return;
+    const data = await r.json();
+    const svcs = data.services || {};
+    for (const [svc, state] of Object.entries(svcs)) {
+      const dot = document.getElementById('dot-' + svc);
+      if (!dot) continue;
+      dot.className = 'svc-dot'; // reset
+      if (state === 'active')   { dot.classList.add('active');   dot.title = svc + ': active'; }
+      else if (state === 'inactive' || state === 'failed' || state === 'dead') {
+        dot.classList.add('inactive'); dot.title = svc + ': ' + state;
+      } else {
+        dot.classList.add('unknown'); dot.title = svc + ': ' + state;
+      }
+    }
+  } catch { /* silent — dots stay grey */ }
+}
+
+// Enable auto-refresh by default
+document.getElementById('autoRefresh').checked = true;
+fetchLogs();
+autoTimer = setInterval(fetchLogs, 15000);
+
+// Load service status on init + refresh every 30s
+loadServiceStatus();
+svcStatusTimer = setInterval(loadServiceStatus, 30000);
+</script>
+</body>
+</html>

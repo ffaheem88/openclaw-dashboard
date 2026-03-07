@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🤖 Clawdbot – Sign In</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --bg-primary: #0a0e17;
+      --bg-secondary: #0f1420;
+      --glass-bg: rgba(255, 255, 255, 0.03);
+      --glass-border: rgba(255, 255, 255, 0.08);
+      --glass-highlight: rgba(255, 255, 255, 0.12);
+      --text-primary: #f1f5f9;
+      --text-secondary: #94a3b8;
+      --text-muted: #64748b;
+      --accent-cyan: #06b6d4;
+      --accent-purple: #8b5cf6;
+      --accent-pink: #ec4899;
+      --accent-emerald: #10b981;
+      --accent-amber: #f59e0b;
+      --accent-rose: #f43f5e;
+      --accent-blue: #3b82f6;
+      --accent-red: #ef4444;
+      --gradient-primary: linear-gradient(135deg, #06b6d4 0%, #8b5cf6 50%, #ec4899 100%);
+      --shadow-glow: 0 0 40px rgba(6, 182, 212, 0.15);
+      --shadow-card: 0 8px 32px rgba(0, 0, 0, 0.3);
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      font-size: 14px;
+      line-height: 1.6;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow-x: hidden;
+    }
+
+    /* Animated Background */
+    body::before {
+      content: '';
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background:
+        radial-gradient(ellipse at 20% 20%, rgba(6, 182, 212, 0.08) 0%, transparent 50%),
+        radial-gradient(ellipse at 80% 80%, rgba(139, 92, 246, 0.08) 0%, transparent 50%),
+        radial-gradient(ellipse at 50% 50%, rgba(236, 72, 153, 0.03) 0%, transparent 50%);
+      pointer-events: none;
+      z-index: 0;
+      animation: backgroundPulse 15s ease-in-out infinite;
+    }
+
+    @keyframes backgroundPulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.8; transform: scale(1.05); }
+    }
+
+    /* Floating Orbs */
+    .orb {
+      position: fixed;
+      border-radius: 50%;
+      filter: blur(60px);
+      opacity: 0.4;
+      pointer-events: none;
+      z-index: 0;
+      animation: float 20s ease-in-out infinite;
+    }
+    .orb-1 {
+      width: 400px; height: 400px;
+      background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple));
+      top: -100px; left: -100px;
+      animation-delay: 0s;
+    }
+    .orb-2 {
+      width: 300px; height: 300px;
+      background: linear-gradient(135deg, var(--accent-purple), var(--accent-pink));
+      bottom: -50px; right: -50px;
+      animation-delay: -7s;
+    }
+    .orb-3 {
+      width: 200px; height: 200px;
+      background: linear-gradient(135deg, var(--accent-pink), var(--accent-cyan));
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      animation-delay: -14s;
+    }
+
+    @keyframes float {
+      0%, 100% { transform: translate(0, 0) scale(1); }
+      33% { transform: translate(30px, -30px) scale(1.05); }
+      66% { transform: translate(-20px, 20px) scale(0.95); }
+    }
+
+    /* Login card */
+    .login-wrapper {
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      max-width: 400px;
+      padding: 24px;
+    }
+
+    .login-card {
+      background: var(--glass-bg);
+      border: 1px solid var(--glass-border);
+      border-radius: 20px;
+      padding: 40px 36px 32px;
+      backdrop-filter: blur(20px);
+      box-shadow: var(--shadow-card), var(--shadow-glow);
+    }
+
+    .login-logo {
+      text-align: center;
+      margin-bottom: 8px;
+      font-size: 48px;
+      line-height: 1;
+    }
+
+    .login-title {
+      text-align: center;
+      font-size: 24px;
+      font-weight: 700;
+      background: var(--gradient-primary);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 4px;
+    }
+
+    .login-subtitle {
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 13px;
+      margin-bottom: 32px;
+    }
+
+    .form-group {
+      margin-bottom: 16px;
+    }
+
+    .form-label {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 6px;
+    }
+
+    .form-input {
+      width: 100%;
+      padding: 10px 14px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--glass-border);
+      border-radius: 10px;
+      color: var(--text-primary);
+      font-family: inherit;
+      font-size: 14px;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    .form-input:focus {
+      border-color: var(--accent-cyan);
+      box-shadow: 0 0 0 3px rgba(6, 182, 212, 0.15);
+    }
+
+    .form-input::placeholder {
+      color: var(--text-muted);
+    }
+
+    .error-msg {
+      display: none;
+      background: rgba(239, 68, 68, 0.12);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      border-radius: 8px;
+      padding: 10px 14px;
+      color: var(--accent-red);
+      font-size: 13px;
+      margin-bottom: 16px;
+      text-align: center;
+    }
+    .error-msg.visible { display: block; }
+
+    .sign-in-btn {
+      width: 100%;
+      padding: 12px;
+      margin-top: 8px;
+      background: var(--gradient-primary);
+      border: none;
+      border-radius: 10px;
+      color: #fff;
+      font-family: inherit;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.2s, transform 0.1s;
+    }
+
+    .sign-in-btn:hover { opacity: 0.9; transform: translateY(-1px); }
+    .sign-in-btn:active { transform: translateY(0); }
+
+    .login-footer {
+      text-align: center;
+      margin-top: 20px;
+      color: var(--text-muted);
+      font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+  <div class="orb orb-3"></div>
+
+  <div class="login-wrapper">
+    <div class="login-card">
+      <div class="login-logo">🤖</div>
+      <div class="login-title">Clawdbot</div>
+      <div class="login-subtitle">Dashboard</div>
+
+      <div class="error-msg" id="errorMsg">Invalid credentials. Please try again.</div>
+
+      <form method="POST" action="/login">
+        <div class="form-group">
+          <label class="form-label" for="username">Username</label>
+          <input class="form-input" type="text" id="username" name="username"
+                 placeholder="admin" autocomplete="username" required autofocus>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="password">Password</label>
+          <input class="form-input" type="password" id="password" name="password"
+                 placeholder="••••••••" autocomplete="current-password" required>
+        </div>
+        <button class="sign-in-btn" type="submit">Sign In</button>
+      </form>
+
+      <div class="login-footer">Session expires in 24 hours</div>
+    </div>
+  </div>
+
+  <script>
+    // Show error banner if ?error=1 in URL
+    if (new URLSearchParams(window.location.search).get('error') === '1') {
+      document.getElementById('errorMsg').classList.add('visible');
+    }
+  </script>
+</body>
+</html>

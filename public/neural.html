@@ -1,0 +1,1604 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>🧠 Neural Mind Map</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/three@0.158.0/build/three.min.js"></script>
+  <script src="https://unpkg.com/3d-force-graph@1.73.3/dist/3d-force-graph.min.js"></script>
+  <style>
+    :root {
+      --bg: #030608;
+      --glass-bg: rgba(10,14,23,0.82);
+      --glass-border: rgba(255,255,255,0.10);
+      --glass-border-bright: rgba(255,255,255,0.18);
+      --text-primary: #f1f5f9;
+      --text-secondary: #94a3b8;
+      --text-muted: #475569;
+      --cyan: #06b6d4;
+      --amber: #f59e0b;
+      --purple: #8b5cf6;
+      --fuchsia: #d946ef;
+      --green: #10b981;
+      --red: #f43f5e;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      width: 100vw; height: 100vh;
+      overflow: hidden;
+      background: var(--bg);
+      font-family: 'Inter', sans-serif;
+      color: var(--text-primary);
+    }
+
+    /* ── graph container ── */
+    #graph-container {
+      position: fixed; inset: 0;
+      z-index: 1;
+    }
+    #graph-container canvas { display: block; }
+    #label-overlay {
+      position: fixed; inset: 0;
+      z-index: 3;
+      pointer-events: none;
+    }
+
+    /* ── glass util ── */
+    .glass {
+      background: var(--glass-bg);
+      border: 1px solid var(--glass-border);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border-radius: 12px;
+    }
+
+    /* ── Top bar row 1: logo + search + nav ── */
+    #top-bar {
+      position: fixed; top: 0; left: 0; right: 0;
+      z-index: 15; height: 44px;
+      display: flex; align-items: center; gap: 6px;
+      padding: 0 12px;
+      background: rgba(8,12,22,0.92);
+      backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--glass-border);
+    }
+    .logo-dot {
+      width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0;
+      background: var(--cyan); box-shadow: 0 0 7px var(--cyan);
+      animation: pulse 2s infinite;
+    }
+    .logo-emoji { font-size: 16px; flex-shrink: 0; line-height: 1; }
+    .logo-title {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px; font-weight: 500; color: var(--cyan);
+      letter-spacing: 0.07em; white-space: nowrap; flex-shrink: 0;
+    }
+    .tb-spacer { flex: 1; min-width: 0; }
+    #search-input {
+      width: clamp(80px, 18vw, 160px);
+      background: rgba(255,255,255,0.05);
+      border: 1px solid var(--glass-border); border-radius: 6px;
+      color: var(--text-primary); font-family: inherit;
+      font-size: 12px; padding: 4px 9px; outline: none;
+      transition: border-color .2s, width .25s; flex-shrink: 0;
+    }
+    #search-input:focus { border-color: var(--cyan); width: clamp(110px, 22vw, 200px); }
+    #search-input::placeholder { color: var(--text-muted); }
+    .hud-divider { width: 1px; height: 18px; background: var(--glass-border); flex-shrink: 0; }
+    .hud-btn {
+      width: 28px; height: 28px; flex-shrink: 0;
+      background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border);
+      border-radius: 6px; color: var(--text-secondary); font-size: 13px;
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
+      text-decoration: none; line-height: 1;
+      transition: background .2s, color .2s, border-color .2s;
+    }
+    .hud-btn:hover { background: rgba(6,182,212,0.15); color: var(--cyan); border-color: rgba(6,182,212,0.4); }
+
+    /* ── Stats bar row 2 ── */
+    #stats-bar {
+      position: fixed; top: 44px; left: 0; right: 0;
+      z-index: 14; height: 32px;
+      display: flex; align-items: center; gap: 8px;
+      padding: 0 14px;
+      background: rgba(8,12,22,0.78);
+      backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+      overflow-x: auto; scrollbar-width: none;
+    }
+    #stats-bar::-webkit-scrollbar { display: none; }
+    .stat-chip {
+      background: rgba(255,255,255,0.04); border: 1px solid var(--glass-border);
+      border-radius: 5px; padding: 2px 8px;
+      font-size: 11px; color: var(--text-secondary);
+      white-space: nowrap; flex-shrink: 0;
+    }
+    .stat-chip b { color: var(--text-primary); font-weight: 600; margin-left: 3px; }
+
+    /* ── Legend bar at bottom ── */
+    #legend-bar {
+      position: fixed; bottom: 0; left: 0; right: 0;
+      z-index: 10;
+      display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+      padding: 7px 14px;
+      padding-bottom: max(7px, env(safe-area-inset-bottom));
+      background: rgba(8,12,22,0.85);
+      backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+      border-top: 1px solid var(--glass-border);
+      font-size: 11px; color: var(--text-muted);
+    }
+    .legend-item { display: flex; align-items: center; gap: 5px; white-space: nowrap; }
+    .legend-dot { width: 8px; height: 8px; border-radius: 50%; box-shadow: 0 0 5px currentColor; }
+    .legend-line { width: 18px; height: 2px; border-radius: 1px; }
+    .legend-dashed { width: 18px; height: 0; border-top: 2px dashed; }
+
+    /* Responsive */
+    @media (max-width: 520px) { .logo-title { display: none; } }
+    @media (max-width: 380px) { .hud-nav { display: none; } }
+
+    /* ── Hot Concepts panel ── */
+    #hot-concepts-panel {
+      position: fixed;
+      top: 82px;
+      left: 14px;
+      z-index: 18;
+      width: 200px;
+      background: rgba(8,12,22,0.88);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--glass-border-bright);
+      border-radius: 12px;
+      overflow: hidden;
+      transition: max-height 0.3s cubic-bezier(0.4,0,0.2,1), opacity 0.2s;
+    }
+    #hot-concepts-panel.collapsed { max-height: 36px; }
+    #hot-concepts-panel:not(.collapsed) { max-height: 340px; }
+    #hcp-header {
+      display: flex; align-items: center; gap: 6px;
+      padding: 6px 10px;
+      cursor: pointer;
+      user-select: none;
+      border-bottom: 1px solid transparent;
+      transition: border-color 0.2s;
+    }
+    #hot-concepts-panel:not(.collapsed) #hcp-header {
+      border-bottom-color: var(--glass-border);
+    }
+    #hcp-header:hover { background: rgba(255,255,255,0.03); }
+    #hcp-title {
+      font-size: 11px; font-weight: 700; color: var(--amber);
+      letter-spacing: 0.08em; font-family: 'JetBrains Mono', monospace;
+      flex: 1;
+    }
+    #hcp-chevron {
+      font-size: 10px; color: var(--text-muted);
+      transition: transform 0.25s;
+    }
+    #hot-concepts-panel.collapsed #hcp-chevron { transform: rotate(-90deg); }
+    #hcp-body {
+      padding: 8px 8px 10px;
+      display: flex; flex-direction: column; gap: 4px;
+      overflow-y: auto; max-height: 300px;
+      scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.08) transparent;
+    }
+    #hcp-body::-webkit-scrollbar { width: 3px; }
+    #hcp-body::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); }
+    .hcp-chip {
+      display: flex; align-items: center; gap: 5px;
+      padding: 4px 7px;
+      border-radius: 6px;
+      border: 1px solid rgba(245,158,11,0.18);
+      background: rgba(245,158,11,0.06);
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .hcp-chip:hover {
+      background: rgba(245,158,11,0.18);
+      border-color: rgba(245,158,11,0.45);
+    }
+    .hcp-chip.active {
+      background: rgba(245,158,11,0.22);
+      border-color: var(--amber);
+    }
+    .hcp-rank {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 9px; color: var(--text-muted);
+      min-width: 14px; text-align: right; flex-shrink: 0;
+    }
+    .hcp-label {
+      font-size: 11px; color: var(--text-secondary);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      flex: 1;
+    }
+    .hcp-chip:hover .hcp-label, .hcp-chip.active .hcp-label { color: var(--amber); }
+    .hcp-bar-wrap {
+      width: 24px; height: 3px;
+      background: rgba(255,255,255,0.06); border-radius: 2px; flex-shrink: 0;
+    }
+    .hcp-bar {
+      height: 100%; border-radius: 2px;
+      background: linear-gradient(90deg, var(--amber), #fcd34d);
+      box-shadow: 0 0 4px rgba(245,158,11,0.4);
+    }
+    #hcp-footer {
+      padding: 0 10px 6px;
+      font-size: 10px; color: var(--text-muted);
+      text-align: center;
+    }
+
+    /* ── Detail panel ── */
+
+
+
+
+    /* ── Detail panel ── */
+    #detail-panel {
+      position: fixed;
+      top: 80px; right: 14px; bottom: 60px;
+      width: 320px;
+      z-index: 20;
+      overflow-y: auto;
+      overflow-x: hidden;
+      transform: translateX(360px);
+      transition: transform 0.32s cubic-bezier(0.4, 0, 0.2, 1);
+      background: rgba(8,12,22,0.92);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid var(--glass-border-bright);
+      border-radius: 16px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(255,255,255,0.1) transparent;
+    }
+    #detail-panel.open { transform: translateX(0); }
+
+    #detail-panel::-webkit-scrollbar { width: 4px; }
+    #detail-panel::-webkit-scrollbar-track { background: transparent; }
+    #detail-panel::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
+
+    .dp-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+    .dp-label { font-size: 16px; font-weight: 700; line-height: 1.3; flex: 1; }
+    .dp-label.fiber { color: var(--amber); }
+    .dp-label.concept { color: var(--cyan); }
+    .dp-label.time { color: var(--text-secondary); }
+    .dp-close {
+      width: 28px; height: 28px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid var(--glass-border);
+      border-radius: 6px;
+      color: var(--text-secondary);
+      font-size: 14px;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+      transition: background .2s, color .2s;
+    }
+    .dp-close:hover { background: rgba(244,63,94,0.2); color: var(--red); border-color: rgba(244,63,94,0.4); }
+
+    .type-badge {
+      display: inline-flex; align-items: center;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .type-badge.fiber { background: rgba(245,158,11,0.15); color: var(--amber); border: 1px solid rgba(245,158,11,0.3); }
+    .type-badge.concept { background: rgba(6,182,212,0.15); color: var(--cyan); border: 1px solid rgba(6,182,212,0.3); }
+    .type-badge.time { background: rgba(148,163,184,0.15); color: var(--text-secondary); border: 1px solid rgba(148,163,184,0.3); }
+
+    .dp-section { display: flex; flex-direction: column; gap: 8px; }
+    .dp-section-title {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      color: var(--text-muted);
+      font-family: 'JetBrains Mono', monospace;
+      text-transform: uppercase;
+    }
+    .stat-bar-wrap { display: flex; flex-direction: column; gap: 4px; }
+    .stat-bar-label { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-secondary); }
+    .stat-bar-track {
+      height: 4px;
+      background: rgba(255,255,255,0.06);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    .stat-bar-fill {
+      height: 100%;
+      border-radius: 2px;
+      transition: width 0.6s ease;
+    }
+    .stat-bar-fill.cyan { background: linear-gradient(90deg, var(--cyan), #67e8f9); box-shadow: 0 0 6px rgba(6,182,212,0.5); }
+    .stat-bar-fill.amber { background: linear-gradient(90deg, var(--amber), #fcd34d); box-shadow: 0 0 6px rgba(245,158,11,0.5); }
+    .stat-bar-fill.purple { background: linear-gradient(90deg, var(--purple), #a78bfa); }
+
+    .dp-meta-row { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-secondary); }
+    .dp-meta-row span:last-child { color: var(--text-primary); font-weight: 500; }
+
+    .tags-wrap { display: flex; flex-wrap: wrap; gap: 5px; }
+    .tag-chip {
+      background: rgba(139,92,246,0.12);
+      border: 1px solid rgba(139,92,246,0.25);
+      color: #a78bfa;
+      border-radius: 4px;
+      padding: 2px 7px;
+      font-size: 11px;
+    }
+
+    .conn-list { display: flex; flex-direction: column; gap: 3px; max-height: 200px; overflow-y: auto; }
+    .conn-list::-webkit-scrollbar { width: 3px; }
+    .conn-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); }
+    .conn-item {
+      padding: 5px 8px;
+      border-radius: 6px;
+      font-size: 11px;
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: background .15s, color .15s;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .conn-item:hover { background: rgba(6,182,212,0.1); color: var(--cyan); }
+    .conn-item .ci-type { font-size: 9px; color: var(--text-muted); margin-right: 4px; }
+
+    .recall-input-wrap { display: flex; flex-direction: column; gap: 6px; }
+    .recall-input-wrap input, .recall-input-wrap textarea {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid var(--glass-border);
+      border-radius: 8px;
+      color: var(--text-primary);
+      font-family: inherit;
+      font-size: 12px;
+      padding: 8px 10px;
+      outline: none;
+      width: 100%;
+      transition: border-color .2s;
+    }
+    .recall-input-wrap input:focus { border-color: var(--cyan); }
+    .recall-btn {
+      background: linear-gradient(135deg, rgba(6,182,212,0.2), rgba(139,92,246,0.2));
+      border: 1px solid rgba(6,182,212,0.3);
+      border-radius: 8px;
+      color: var(--cyan);
+      font-family: inherit;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 8px;
+      cursor: pointer;
+      transition: background .2s, border-color .2s;
+    }
+    .recall-btn:hover { background: linear-gradient(135deg, rgba(6,182,212,0.35), rgba(139,92,246,0.35)); border-color: var(--cyan); }
+    #recall-result {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      color: var(--cyan);
+      white-space: pre-wrap;
+      line-height: 1.5;
+      max-height: 150px;
+      overflow-y: auto;
+      display: none;
+      background: rgba(6,182,212,0.05);
+      border: 1px solid rgba(6,182,212,0.15);
+      border-radius: 6px;
+      padding: 8px;
+    }
+
+    /* ── Loading overlay ── */
+    #loading-overlay {
+      position: fixed; inset: 0; z-index: 50;
+      background: #030608;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 20px;
+      transition: opacity 0.8s ease;
+    }
+    #loading-overlay.hidden { opacity: 0; pointer-events: none; }
+    .loading-brain {
+      font-size: 64px;
+      animation: brain-pulse 1.5s ease-in-out infinite;
+    }
+    @keyframes brain-pulse {
+      0%, 100% { transform: scale(1); filter: brightness(1); }
+      50% { transform: scale(1.1); filter: brightness(1.5) drop-shadow(0 0 20px rgba(6,182,212,0.6)); }
+    }
+    .loading-status {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      color: var(--cyan);
+      text-align: center;
+      min-height: 20px;
+    }
+    .loading-bar-track {
+      width: 280px; height: 4px;
+      background: rgba(255,255,255,0.06);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    .loading-bar-fill {
+      height: 100%; width: 0%;
+      background: linear-gradient(90deg, var(--cyan), var(--purple));
+      border-radius: 2px;
+      transition: width 0.4s ease;
+      box-shadow: 0 0 10px rgba(6,182,212,0.5);
+    }
+    .loading-substatus {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      color: var(--text-muted);
+      text-align: center;
+    }
+
+    /* ── Animations ── */
+    @keyframes pulse {
+      0%,100% { opacity: 1; box-shadow: 0 0 8px var(--cyan); }
+      50% { opacity: 0.5; box-shadow: 0 0 3px var(--cyan); }
+    }
+    @keyframes scanline {
+      0% { transform: translateY(-100%); }
+      100% { transform: translateY(100vh); }
+    }
+    /* scanline overlay for extra scifi feel */
+    #scanline {
+      position: fixed; inset: 0; z-index: 2;
+      pointer-events: none;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0,0,0,0.03) 2px,
+        rgba(0,0,0,0.03) 4px
+      );
+    }
+  </style>
+</head>
+<body>
+
+<!-- Loading overlay -->
+<div id="loading-overlay">
+  <div class="loading-brain">🧠</div>
+  <div class="loading-status" id="loading-status">Waking up neurons...</div>
+  <div class="loading-bar-track"><div class="loading-bar-fill" id="loading-bar"></div></div>
+  <div class="loading-substatus" id="loading-substatus"></div>
+</div>
+
+<!-- 3D canvas container -->
+<div id="graph-container"></div>
+<canvas id="label-overlay"></canvas>
+
+<!-- Scanline overlay -->
+<div id="scanline"></div>
+
+<!-- Row 1: logo + search + nav -->
+<div id="top-bar">
+  <div class="logo-dot"></div>
+  <span class="logo-emoji">🧠</span>
+  <span class="logo-title">NEURAL MIND MAP</span>
+  <div class="tb-spacer"></div>
+  <input id="search-input" type="text" placeholder="search…" />
+  <div class="hud-divider"></div>
+  <button class="hud-btn" id="btn-fullscreen" title="Fullscreen">⛶</button>
+  <div class="hud-divider"></div>
+  <a class="hud-btn hud-nav" href="index.html" title="Dashboard">🏠</a>
+  <a class="hud-btn hud-nav" href="mail.html" title="Mail">📧</a>
+  <a class="hud-btn hud-nav" href="agents.html" title="Agents">🎛️</a>
+  <a class="hud-btn hud-nav" href="settings.html" title="Settings">⚙️</a>
+  <a class="hud-btn hud-nav" href="logs.html" title="Logs">📋</a>
+  <a class="hud-btn hud-nav" href="identity.html" title="Identity">🧠</a>
+  <a class="hud-btn hud-nav" href="/logout" title="Logout" style="color: var(--accent-red, #ef4444);">⏏</a>
+</div>
+
+<!-- Row 2: stats -->
+<div id="stats-bar">
+  <div class="stat-chip">Neurons <b id="stat-neurons">—</b></div>
+  <div class="stat-chip">Synapses <b id="stat-synapses">—</b></div>
+  <div class="stat-chip">Fibers <b id="stat-fibers">—</b></div>
+  <div class="stat-chip">Trained <b id="stat-trained">—</b></div>
+</div>
+
+<!-- Detail panel -->
+<div id="detail-panel">
+  <div class="dp-header">
+    <div class="dp-label" id="dp-label">Node</div>
+    <button class="dp-close" id="dp-close">✕</button>
+  </div>
+  <div id="dp-badge-wrap"></div>
+
+  <div class="dp-section" id="dp-stats-section">
+    <div class="dp-section-title">Stats</div>
+    <div id="dp-stats-content"></div>
+  </div>
+
+  <div class="dp-section" id="dp-tags-section" style="display:none">
+    <div class="dp-section-title">Tags</div>
+    <div class="tags-wrap" id="dp-tags"></div>
+  </div>
+
+  <div class="dp-section">
+    <div class="dp-section-title">Connected <span id="dp-conn-count" style="color:var(--text-secondary)"></span></div>
+    <div class="conn-list" id="dp-connections"></div>
+  </div>
+
+  <div class="dp-section">
+    <div class="dp-section-title">Ask Brain</div>
+    <div class="recall-input-wrap">
+      <input id="recall-input" type="text" placeholder="Query neural memory…" />
+      <button class="recall-btn" id="recall-btn">⚡ Recall</button>
+      <div id="recall-result"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Hot Concepts panel -->
+<div id="hot-concepts-panel" class="collapsed">
+  <div id="hcp-header">
+    <span id="hcp-title">🔥 HOT CONCEPTS</span>
+    <span id="hcp-chevron">▼</span>
+  </div>
+  <div id="hcp-body">
+    <div style="color:var(--text-muted);font-size:11px;padding:4px 2px">Loading...</div>
+  </div>
+  <div id="hcp-footer"></div>
+</div>
+
+<!-- Legend bar -->
+<div id="legend-bar">
+  <div class="legend-item"><div class="legend-dot" style="color:var(--cyan);background:var(--cyan)"></div>Neuron</div>
+  <div class="legend-item"><div class="legend-dot" style="color:#9b7ed8;background:#9b7ed8"></div>Time</div>
+  <div class="legend-item"><div class="legend-line" style="background:#2a1a0a;opacity:0.5"></div>Fiber link</div>
+  <div class="legend-item"><div class="legend-line" style="background:#1a5a6a"></div>Synapse (co-occurs)</div>
+  <div class="legend-item"><div class="legend-line" style="background:#4a3070"></div>Synapse (related)</div>
+  <div class="legend-item"><div class="legend-line" style="background:#1a4a3a"></div>Synapse (involves)</div>
+</div>
+
+
+
+<script>
+(function() {
+  'use strict';
+
+  // ── State ──────────────────────────────────────────────────────────────────
+  var MAX_VISIBLE_NODES = 2000;
+  let allNodes = [];
+  let allEdges = [];
+  let totalNodesBeforeFilter = 0;
+  let totalEdgesBeforeFilter = 0;
+  let selectedNode = null;
+  let graph = null;
+  let searchQuery = '';
+  let searchMatchIds = null;
+  let nodeIndexMap = {}; // id → index into allNodes
+  let nodeById = {};
+  
+  // ── GPU rendering objects ──
+  let pointsCloud = null;      // THREE.Points for all nodes
+  let edgeLines = null;        // THREE.LineSegments for all edges
+  let pointPositions = null;   // Float32Array
+  let pointColors = null;      // Float32Array
+  let pointSizes = null;       // Float32Array
+  let edgePositions = null;    // Float32Array
+  let edgeColors = null;       // Float32Array
+  let tick = 0;
+  let simulationActive = true;
+  let frameCount = 0;
+  let renderedEdges = []; // top edges by weight for GPU rendering
+  let labelCanvas = null;
+  let labelCtx = null;
+  let labelNodes = [];
+  let labelDistanceThreshold = 700;
+  var labelTmpVec = new THREE.Vector3();
+
+  // ── Loading progress ────────────────────────────────────────────────────
+  var loadingMessages = [
+    'Waking up neurons...',
+    'Brewing neurotransmitters ☕',
+    'Untangling dendrites...',
+    'Charging synaptic vesicles...',
+    'Calibrating action potentials...',
+    'Myelinating axon highways...',
+    'Growing new neural pathways...',
+    'Establishing long-term potentiation...',
+    'Firing up the hippocampus...',
+    'Synchronizing brainwaves...',
+    'Recruiting glial support cells...',
+    'Opening ion channels...',
+    'Balancing dopamine levels...',
+    'Defragmenting memory engrams...',
+    'Warming up the prefrontal cortex...',
+    'Loading consciousness.dll...',
+    'Connecting the connectome...',
+    'Bootstrapping sentience...'
+  ];
+  var loadingMsgIdx = 0;
+  var loadingInterval = null;
+
+  function setLoadingProgress(percent, status, substatus) {
+    var bar = document.getElementById('loading-bar');
+    var statusEl = document.getElementById('loading-status');
+    var subEl = document.getElementById('loading-substatus');
+    if (bar) bar.style.width = Math.min(100, percent) + '%';
+    if (status && statusEl) statusEl.textContent = status;
+    if (substatus !== undefined && subEl) subEl.textContent = substatus;
+  }
+
+  function startLoadingMessages() {
+    loadingInterval = setInterval(function() {
+      loadingMsgIdx = (loadingMsgIdx + 1) % loadingMessages.length;
+      var statusEl = document.getElementById('loading-status');
+      if (statusEl) statusEl.textContent = loadingMessages[loadingMsgIdx];
+    }, 2000);
+  }
+
+  function hideLoading() {
+    if (loadingInterval) clearInterval(loadingInterval);
+    var overlay = document.getElementById('loading-overlay');
+    if (overlay) overlay.classList.add('hidden');
+    setTimeout(function() { if (overlay) overlay.style.display = 'none'; }, 800);
+  }
+
+  // ── Helpers ────────────────────────────────────────────────────────────────
+  var fiberColors = [
+    '#e8a035', '#3dc8e0', '#9b7ed8', '#e06080', '#50c878',
+    '#d4943a', '#6eb5ff', '#c77dba', '#f0c050', '#5eead4',
+    '#ff8a65', '#81c784', '#ba68c8', '#4fc3f7', '#fff176'
+  ];
+  var fiberColorMap = {};
+  var fiberColorIdx = 0;
+
+  function getFiberColor(fiberId) {
+    if (!fiberId) return '#3dc8e0';
+    if (!fiberColorMap[fiberId]) {
+      fiberColorMap[fiberId] = fiberColors[fiberColorIdx % fiberColors.length];
+      fiberColorIdx++;
+    }
+    return fiberColorMap[fiberId];
+  }
+
+  function nodeColor(node) {
+    if (node.type === 'fiber') return getFiberColor(node.id);
+    if (node.type === 'time') return '#9b7ed8';
+    return getFiberColor(node.fiberId);
+  }
+
+  function linkColorBase(link) {
+    var t = link.type;
+    if (t === 'fiber_neuron') return '#6a4a1a';
+    if (t === 'co_occurs') return '#2a8aaa';
+    if (t === 'related_to') return '#7a50b0';
+    if (t === 'computed_similar') return '#8a3a8a';
+    if (t === 'involves') return '#2a7a5a';
+    if (t === 'after' || t === 'before') return '#3a5a7a';
+    if (t === 'contains') return '#4a6a8a';
+    return '#1a2a3a';
+  }
+
+  function edgeSourceId(edge) {
+    return edge && edge.source && edge.source.id ? edge.source.id : edge.source;
+  }
+
+  function edgeTargetId(edge) {
+    return edge && edge.target && edge.target.id ? edge.target.id : edge.target;
+  }
+
+  function filterToMostConnected(nodes, edges, maxNodes) {
+    var degree = {};
+    for (var i = 0; i < nodes.length; i++) degree[nodes[i].id] = 0;
+
+    for (var j = 0; j < edges.length; j++) {
+      var s = edgeSourceId(edges[j]);
+      var t = edgeTargetId(edges[j]);
+      if (s != null && degree[s] !== undefined) degree[s]++;
+      if (t != null && degree[t] !== undefined) degree[t]++;
+    }
+
+    var rankedNodes = nodes.slice().sort(function(a, b) {
+      var da = degree[a.id] || 0;
+      var db = degree[b.id] || 0;
+      if (db !== da) return db - da;
+      return String(a.id).localeCompare(String(b.id));
+    });
+
+    var cappedNodes = rankedNodes;
+    if (rankedNodes.length > maxNodes) {
+      cappedNodes = rankedNodes.slice(0, maxNodes);
+    }
+
+    var keepIds = new Set(cappedNodes.map(function(n) { return n.id; }));
+    var cappedEdges = edges.filter(function(e) {
+      var s = edgeSourceId(e);
+      var t = edgeTargetId(e);
+      return keepIds.has(s) && keepIds.has(t);
+    });
+
+    for (var k = 0; k < cappedNodes.length; k++) {
+      cappedNodes[k].degree = degree[cappedNodes[k].id] || 0;
+    }
+
+    return { nodes: cappedNodes, edges: cappedEdges };
+  }
+
+  function debounce(fn, delay) {
+    var timer = null;
+    return function() {
+      var args = arguments;
+      clearTimeout(timer);
+      timer = setTimeout(function() {
+        fn.apply(null, args);
+      }, delay);
+    };
+  }
+
+  function initLabelOverlay() {
+    labelCanvas = document.getElementById('label-overlay');
+    if (!labelCanvas) return;
+    labelCtx = labelCanvas.getContext('2d', { alpha: true });
+    resizeLabelOverlay();
+  }
+
+  function resizeLabelOverlay() {
+    if (!labelCanvas) return;
+    var dpr = 1;
+    labelCanvas.width = Math.floor(window.innerWidth * dpr);
+    labelCanvas.height = Math.floor(window.innerHeight * dpr);
+    labelCanvas.style.width = window.innerWidth + 'px';
+    labelCanvas.style.height = window.innerHeight + 'px';
+    if (labelCtx) {
+      labelCtx.setTransform(1, 0, 0, 1, 0, 0);
+      labelCtx.scale(dpr, dpr);
+    }
+  }
+
+  function refreshLabelCandidates() {
+    labelNodes = allNodes.slice().sort(function(a, b) {
+      return (b.degree || 0) - (a.degree || 0);
+    }).slice(0, 280);
+  }
+
+  function drawLabelsLOD() {
+    if (!labelCtx || !graph || !allNodes.length) return;
+    var w = window.innerWidth;
+    var h = window.innerHeight;
+    labelCtx.clearRect(0, 0, w, h);
+
+    var camera = graph.camera();
+    if (!camera) return;
+    if (camera.position.length() > labelDistanceThreshold) return;
+
+    var nodesToDraw = [];
+    var seen = {};
+    function addNode(n) {
+      if (!n || seen[n.id]) return;
+      seen[n.id] = true;
+      nodesToDraw.push(n);
+    }
+
+    addNode(selectedNode);
+    if (searchMatchIds) {
+      var searchCount = 0;
+      for (var i = 0; i < allNodes.length && searchCount < 100; i++) {
+        if (searchMatchIds.has(allNodes[i].id)) {
+          addNode(allNodes[i]);
+          searchCount++;
+        }
+      }
+    }
+
+    var maxBaseLabels = getDetailLevel() === 'low' ? 50 : (getDetailLevel() === 'medium' ? 100 : 160);
+    for (var j = 0; j < labelNodes.length && j < maxBaseLabels; j++) {
+      addNode(labelNodes[j]);
+    }
+
+    labelCtx.font = '11px "JetBrains Mono", monospace';
+    labelCtx.textAlign = 'left';
+    labelCtx.textBaseline = 'middle';
+    for (var k = 0; k < nodesToDraw.length; k++) {
+      var node = nodesToDraw[k];
+      if (node.x == null || node.y == null || node.z == null) continue;
+      labelTmpVec.set(node.x, node.y, node.z).project(camera);
+      if (labelTmpVec.z < -1 || labelTmpVec.z > 1) continue;
+      var sx = (labelTmpVec.x * 0.5 + 0.5) * w;
+      var sy = (-labelTmpVec.y * 0.5 + 0.5) * h;
+      if (sx < 0 || sy < 0 || sx > w || sy > h) continue;
+
+      var text = node.label || node.id;
+      labelCtx.strokeStyle = 'rgba(3,6,8,0.8)';
+      labelCtx.lineWidth = 3;
+      labelCtx.strokeText(text, sx + 7, sy - 8);
+      labelCtx.fillStyle = nodeColor(node);
+      labelCtx.fillText(text, sx + 7, sy - 8);
+    }
+  }
+
+  // ── Glow sprite texture for the Points shader ──
+  var glowCanvas = document.createElement('canvas');
+  glowCanvas.width = 64; glowCanvas.height = 64;
+  var gctx = glowCanvas.getContext('2d');
+  var gg = gctx.createRadialGradient(32,32,0, 32,32,32);
+  gg.addColorStop(0, 'rgba(255,255,255,1)');
+  gg.addColorStop(0.15, 'rgba(255,255,255,0.8)');
+  gg.addColorStop(0.4, 'rgba(200,220,255,0.3)');
+  gg.addColorStop(0.7, 'rgba(100,150,255,0.05)');
+  gg.addColorStop(1, 'rgba(0,0,0,0)');
+  gctx.fillStyle = gg;
+  gctx.fillRect(0,0,64,64);
+  var glowTexture = new THREE.CanvasTexture(glowCanvas);
+
+  // ── Build GPU buffers for nodes (THREE.Points) ──
+  function buildPointsCloud(scene) {
+    var N = allNodes.length;
+    pointPositions = new Float32Array(N * 3);
+    pointColors = new Float32Array(N * 3);
+    pointSizes = new Float32Array(N);
+
+    for (var i = 0; i < N; i++) {
+      var node = allNodes[i];
+      pointPositions[i*3] = node.x || 0;
+      pointPositions[i*3+1] = node.y || 0;
+      pointPositions[i*3+2] = node.z || 0;
+      var c = new THREE.Color(nodeColor(node));
+      pointColors[i*3] = c.r;
+      pointColors[i*3+1] = c.g;
+      pointColors[i*3+2] = c.b;
+      pointSizes[i] = node.type === 'fiber' ? 6.0 : (3.0 + (node.size || 0) * 0.5);
+    }
+
+    var geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(pointPositions, 3));
+    geo.setAttribute('color', new THREE.BufferAttribute(pointColors, 3));
+    geo.setAttribute('size', new THREE.BufferAttribute(pointSizes, 1));
+
+    var mat = new THREE.ShaderMaterial({
+      uniforms: {
+        uTexture: { value: glowTexture },
+        uTime: { value: 0 },
+        uSimpleMode: { value: 0.0 }
+      },
+      vertexShader: `
+        attribute float size;
+        varying vec3 vColor;
+        varying float vSize;
+        uniform float uTime;
+        uniform float uSimpleMode;
+        void main() {
+          vColor = color;
+          vSize = size;
+          vec4 mvPos = modelViewMatrix * vec4(position, 1.0);
+          // Breathing: subtle size pulse
+          float breath = 1.0 + 0.08 * sin(uTime * 0.8 + position.x * 0.1 + position.y * 0.13);
+          float scale = mix(300.0, 200.0, uSimpleMode);
+          gl_PointSize = size * breath * (scale / -mvPos.z);
+          gl_Position = projectionMatrix * mvPos;
+        }
+      `,
+      fragmentShader: `
+        uniform sampler2D uTexture;
+        uniform float uSimpleMode;
+        varying vec3 vColor;
+        varying float vSize;
+        void main() {
+          vec4 tex = texture2D(uTexture, gl_PointCoord);
+          if (tex.a < 0.01) discard;
+          if (uSimpleMode > 0.5) {
+            gl_FragColor = vec4(vColor, tex.a);
+            return;
+          }
+          // Bioluminescent glow: bright core, colored halo
+          vec3 core = mix(vColor, vec3(1.0), 0.5);
+          vec3 finalColor = mix(vColor * 1.5, core, tex.a);
+          gl_FragColor = vec4(finalColor, tex.a * 0.85);
+        }
+      `,
+      transparent: true,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      vertexColors: true
+    });
+
+    if (pointsCloud) scene.remove(pointsCloud);
+    pointsCloud = new THREE.Points(geo, mat);
+    pointsCloud.frustumCulled = false;
+    scene.add(pointsCloud);
+  }
+
+  // ── Build GPU buffers for edges (THREE.LineSegments) ──
+  function buildEdgeLines(scene) {
+    // Adaptive edge limit based on device
+    var detail = getDetailLevel();
+    var MAX_RENDERED_EDGES = detail === 'low' ? 1000 : (detail === 'medium' ? 5000 : 10000);
+    if (allEdges.length > MAX_RENDERED_EDGES) {
+      renderedEdges = allEdges.slice().sort(function(a, b) {
+        return (b.weight || 0) - (a.weight || 0);
+      }).slice(0, MAX_RENDERED_EDGES);
+    } else {
+      renderedEdges = allEdges;
+    }
+
+    var E = renderedEdges.length;
+    edgePositions = new Float32Array(E * 6); // 2 vertices per edge × 3 coords
+    edgeColors = new Float32Array(E * 6);
+
+    for (var i = 0; i < E; i++) {
+      var edge = renderedEdges[i];
+      var src = typeof edge.source === 'object' ? edge.source : allNodes[nodeIndexMap[edge.source]];
+      var tgt = typeof edge.target === 'object' ? edge.target : allNodes[nodeIndexMap[edge.target]];
+      if (!src || !tgt) continue;
+      edgePositions[i*6]   = src.x || 0;
+      edgePositions[i*6+1] = src.y || 0;
+      edgePositions[i*6+2] = src.z || 0;
+      edgePositions[i*6+3] = tgt.x || 0;
+      edgePositions[i*6+4] = tgt.y || 0;
+      edgePositions[i*6+5] = tgt.z || 0;
+      var c = new THREE.Color(linkColorBase(edge));
+      edgeColors[i*6]   = c.r; edgeColors[i*6+1] = c.g; edgeColors[i*6+2] = c.b;
+      edgeColors[i*6+3] = c.r; edgeColors[i*6+4] = c.g; edgeColors[i*6+5] = c.b;
+    }
+
+    var geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(edgePositions, 3));
+    geo.setAttribute('color', new THREE.BufferAttribute(edgeColors, 3));
+
+    var mat = new THREE.LineBasicMaterial({
+      vertexColors: true,
+      transparent: true,
+      opacity: 0.18,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false
+    });
+
+    if (edgeLines) scene.remove(edgeLines);
+    edgeLines = new THREE.LineSegments(geo, mat);
+    edgeLines.frustumCulled = false;
+    scene.add(edgeLines);
+  }
+
+  // ── Update positions from force graph layout ──
+  function syncPositions() {
+    if (!pointsCloud || !edgeLines || !pointPositions || !edgePositions) return;
+    var N = allNodes.length;
+    for (var i = 0; i < N; i++) {
+      var node = allNodes[i];
+      pointPositions[i*3]   = node.x || 0;
+      pointPositions[i*3+1] = node.y || 0;
+      pointPositions[i*3+2] = node.z || 0;
+    }
+    pointsCloud.geometry.attributes.position.needsUpdate = true;
+    pointsCloud.geometry.boundingSphere = null;
+
+    var E = renderedEdges.length;
+    for (var j = 0; j < E; j++) {
+      var edge = renderedEdges[j];
+      var src = typeof edge.source === 'object' ? edge.source : null;
+      var tgt = typeof edge.target === 'object' ? edge.target : null;
+      if (!src || !tgt) continue;
+      edgePositions[j*6]   = src.x || 0;
+      edgePositions[j*6+1] = src.y || 0;
+      edgePositions[j*6+2] = src.z || 0;
+      edgePositions[j*6+3] = tgt.x || 0;
+      edgePositions[j*6+4] = tgt.y || 0;
+      edgePositions[j*6+5] = tgt.z || 0;
+    }
+    edgeLines.geometry.attributes.position.needsUpdate = true;
+  }
+
+  // ── MRI Search highlight (update colors in GPU buffer) ──
+  function applySearchHighlight() {
+    if (!pointsCloud || !pointColors || !pointSizes) return;
+    var N = allNodes.length;
+    for (var i = 0; i < N; i++) {
+      var node = allNodes[i];
+      var c;
+      if (!searchMatchIds) {
+        c = new THREE.Color(nodeColor(node));
+        pointSizes[i] = node.type === 'fiber' ? 6.0 : (3.0 + (node.size || 0) * 0.5);
+      } else if (searchMatchIds.has(node.id)) {
+        c = new THREE.Color(nodeColor(node)).multiplyScalar(2.5);
+        pointSizes[i] = node.type === 'fiber' ? 10.0 : (6.0 + (node.size || 0) * 0.8);
+      } else {
+        c = new THREE.Color(0x050810);
+        pointSizes[i] = 1.0;
+      }
+      pointColors[i*3] = c.r; pointColors[i*3+1] = c.g; pointColors[i*3+2] = c.b;
+    }
+    pointsCloud.geometry.attributes.color.needsUpdate = true;
+    pointsCloud.geometry.attributes.size.needsUpdate = true;
+
+    // Edge highlight
+    if (!edgeLines) return;
+    var E = renderedEdges.length;
+    for (var j = 0; j < E; j++) {
+      var edge = renderedEdges[j];
+      var srcId = edgeSourceId(edge);
+      var tgtId = edgeTargetId(edge);
+      var ec;
+      if (!searchMatchIds) {
+        ec = new THREE.Color(linkColorBase(edge));
+      } else if (searchMatchIds.has(srcId) && searchMatchIds.has(tgtId)) {
+        ec = new THREE.Color(linkColorBase(edge)).multiplyScalar(3.0);
+      } else {
+        ec = new THREE.Color(0x020305);
+      }
+      edgeColors[j*6] = ec.r; edgeColors[j*6+1] = ec.g; edgeColors[j*6+2] = ec.b;
+      edgeColors[j*6+3] = ec.r; edgeColors[j*6+4] = ec.g; edgeColors[j*6+5] = ec.b;
+    }
+    edgeLines.geometry.attributes.color.needsUpdate = true;
+    edgeLines.material.opacity = searchMatchIds ? 0.5 : 0.18;
+  }
+
+  // ── Raycaster for clicking Points ──
+  var raycaster = new THREE.Raycaster();
+  raycaster.params.Points.threshold = 15;
+  var mouse = new THREE.Vector2();
+  var mouseDownPos = { x: 0, y: 0 };
+  var mouseDownTime = 0;
+
+  function onCanvasMouseDown(event) {
+    mouseDownPos.x = event.clientX;
+    mouseDownPos.y = event.clientY;
+    mouseDownTime = Date.now();
+  }
+
+  function onCanvasMouseUp(event) {
+    // Only treat as click if mouse barely moved and was quick (not a drag/orbit)
+    var dx = event.clientX - mouseDownPos.x;
+    var dy = event.clientY - mouseDownPos.y;
+    var dist = Math.sqrt(dx*dx + dy*dy);
+    var elapsed = Date.now() - mouseDownTime;
+    if (dist > 5 || elapsed > 300) return; // was a drag, not a click
+
+    var rect = graph.renderer().domElement.getBoundingClientRect();
+    mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+    mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+    raycaster.setFromCamera(mouse, graph.camera());
+    if (pointsCloud) {
+      var intersects = raycaster.intersectObject(pointsCloud);
+      if (intersects.length > 0) {
+        var idx = intersects[0].index;
+        if (idx >= 0 && idx < allNodes.length) {
+          openDetailPanel(allNodes[idx]);
+          flyToNode(allNodes[idx]);
+          return;
+        }
+      }
+    }
+    closeDetailPanel();
+  }
+
+  // ── Graph init ─────────────────────────────────────────────────────────────
+  function initGraph() {
+    var container = document.getElementById('graph-container');
+    graph = ForceGraph3D()(container)
+      .backgroundColor('#030608')
+      .width(window.innerWidth)
+      .height(window.innerHeight)
+      .showNavInfo(false)
+      .nodeId('id')
+      .nodeLabel('')
+      .nodeVisibility(false)     // hide default node rendering
+      .linkVisibility(false)     // hide default link rendering — we use LineSegments
+      .warmupTicks(getDetailLevel() === 'low' ? 10 : (getDetailLevel() === 'medium' ? 16 : 24))
+      .cooldownTicks(getDetailLevel() === 'low' ? 4 : 8)
+      .d3AlphaDecay(0.015)
+      .d3VelocityDecay(0.55);
+
+    // pixelRatio=1 for performance (not devicePixelRatio)
+    graph.renderer().setPixelRatio(1);
+
+    // Track when simulation stops
+    graph.onEngineStop(function() {
+      simulationActive = false;
+    });
+
+    // Adjust forces
+    graph.d3Force('charge').strength(-60).distanceMax(500);
+    graph.d3Force('link').distance(function(link) {
+      if (link.type === 'fiber_neuron') return 30;
+      if (link.type === 'computed_similar') return 80;
+      return 50;
+    }).iterations(1);
+
+    // Click handler on the canvas
+    setTimeout(function() {
+      graph.renderer().domElement.addEventListener('mousedown', onCanvasMouseDown);
+      graph.renderer().domElement.addEventListener('mouseup', onCanvasMouseUp);
+    }, 500);
+
+    // Add atmosphere
+    setTimeout(function() {
+      var scene = graph.scene();
+      // Fog removed — FogExp2 on 22K transparent points is too expensive
+      scene.add(new THREE.AmbientLight(0x3a3a5e, 0.6));
+      var l1 = new THREE.PointLight(0x06b6d4, 0.5, 1500); l1.position.set(100,200,150); scene.add(l1);
+      var l2 = new THREE.PointLight(0x8b5cf6, 0.4, 1200); l2.position.set(-150,-100,200); scene.add(l2);
+      var l3 = new THREE.PointLight(0xf59e0b, 0.3, 1000); l3.position.set(0,150,-200); scene.add(l3);
+
+      // Organic dust (fewer on mobile)
+      var dustGeo = new THREE.BufferGeometry();
+      var dustCount = getDetailLevel() === 'low' ? 300 : (getDetailLevel() === 'medium' ? 800 : 2000);
+      var dPos = new Float32Array(dustCount * 3);
+      var dCol = new Float32Array(dustCount * 3);
+      for (var i = 0; i < dustCount; i++) {
+        dPos[i*3]=(Math.random()-0.5)*5000; dPos[i*3+1]=(Math.random()-0.5)*5000; dPos[i*3+2]=(Math.random()-0.5)*5000;
+        var b = 0.15+Math.random()*0.2;
+        dCol[i*3]=b*0.8; dCol[i*3+1]=b*0.6; dCol[i*3+2]=b*1.0;
+      }
+      dustGeo.setAttribute('position', new THREE.BufferAttribute(dPos, 3));
+      dustGeo.setAttribute('color', new THREE.BufferAttribute(dCol, 3));
+      var dustMat = new THREE.PointsMaterial({ size:1, transparent:true, opacity:0.2, vertexColors:true, sizeAttenuation:false, depthWrite:false, blending:THREE.AdditiveBlending });
+      var dust = new THREE.Points(dustGeo, dustMat);
+      dust.renderOrder = -1;
+      scene.add(dust);
+    }, 300);
+
+    // Only sync positions while simulation is active
+    graph.onEngineTick(function() {
+      tick++;
+      if (simulationActive) {
+        syncPositions();
+      }
+    });
+
+    // Breathing shader: update uTime every 3rd frame (doesn't need 60fps)
+    (function breathingLoop() {
+      frameCount++;
+      try {
+        if (frameCount % 3 === 0 && pointsCloud && pointsCloud.material && pointsCloud.material.uniforms) {
+          pointsCloud.material.uniforms.uTime.value = frameCount * 0.016;
+          var cam = graph ? graph.camera() : null;
+          if (cam) {
+            var isZoomedOut = cam.position.length() > labelDistanceThreshold;
+            pointsCloud.material.uniforms.uSimpleMode.value = isZoomedOut ? 1.0 : 0.0;
+          }
+          drawLabelsLOD();
+        }
+      } catch(e) {}
+      requestAnimationFrame(breathingLoop);
+    })();
+
+    // Orbit quality toggle: pixelRatio=1 during drag, higher on idle
+    setTimeout(function() {
+      try {
+        var controls = graph.controls();
+        var renderer = graph.renderer();
+        var qualityTimer = null;
+        if (controls && controls.addEventListener) {
+          controls.addEventListener('start', function() {
+            clearTimeout(qualityTimer);
+            renderer.setPixelRatio(1);
+          });
+          controls.addEventListener('end', function() {
+            clearTimeout(qualityTimer);
+            qualityTimer = setTimeout(function() {
+              renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            }, 200);
+          });
+        }
+      } catch(e) { console.warn('Orbit quality toggle skipped:', e); }
+    }, 1000);
+  }
+
+  // ── Camera fly-to ──────────────────────────────────────────────────────────
+  function flyToNode(node) {
+    if (!node || node.x == null) return;
+    var dist = 200;
+    graph.cameraPosition(
+      { x: node.x + dist * 0.3, y: node.y + dist * 0.3, z: node.z + dist },
+      { x: node.x, y: node.y, z: node.z },
+      1000
+    );
+  }
+
+
+  // ── Detail panel ───────────────────────────────────────────────────────────
+  function openDetailPanel(node) {
+    if (!node) return;
+    selectedNode = node;
+    var panel = document.getElementById('detail-panel');
+
+    // Label + badge
+    var labelEl = document.getElementById('dp-label');
+    labelEl.textContent = node.label || node.id;
+    labelEl.className = 'dp-label ' + (node.type || 'concept');
+
+    var badgeWrap = document.getElementById('dp-badge-wrap');
+    badgeWrap.innerHTML = '<span class="type-badge ' + (node.type||'concept') + '">' + (node.type||'concept').toUpperCase() + '</span>';
+
+    // Stats
+    var statsEl = document.getElementById('dp-stats-content');
+    var statsHtml = '';
+    if (node.type === 'concept' || node.type === 'time') {
+      var act = Number(node.activation || 0);
+      statsHtml += '<div class="stat-bar-wrap"><div class="stat-bar-label"><span>ACTIVATION</span><span>' + act.toFixed(3) + '</span></div><div class="stat-bar-track"><div class="stat-bar-fill cyan" style="width:' + Math.min(100, act*100) + '%"></div></div></div>';
+      if (node.access_frequency != null) {
+        statsHtml += '<div class="dp-meta-row" style="margin-top:4px"><span>Access Freq</span><span>' + node.access_frequency + '</span></div>';
+      }
+    }
+    if (node.type === 'fiber') {
+      var sal = Number(node.salience || 0);
+      var cond = Number(node.conductivity || 0);
+      var coh = Number(node.coherence || 0);
+      statsHtml += '<div class="stat-bar-wrap"><div class="stat-bar-label"><span>SALIENCE</span><span>' + sal.toFixed(3) + '</span></div><div class="stat-bar-track"><div class="stat-bar-fill amber" style="width:' + Math.min(100, sal*100) + '%"></div></div></div>';
+      statsHtml += '<div class="stat-bar-wrap" style="margin-top:6px"><div class="stat-bar-label"><span>CONDUCTIVITY</span><span>' + cond.toFixed(3) + '</span></div><div class="stat-bar-track"><div class="stat-bar-fill purple" style="width:' + Math.min(100, cond*100) + '%"></div></div></div>';
+      statsHtml += '<div class="dp-meta-row" style="margin-top:4px"><span>Coherence</span><span>' + coh.toFixed(3) + '</span></div>';
+    }
+    statsEl.innerHTML = statsHtml || '<div style="color:var(--text-muted);font-size:12px">No stat data</div>';
+
+    // Tags
+    var tagsSection = document.getElementById('dp-tags-section');
+    var tagsEl = document.getElementById('dp-tags');
+    if (node.tags && node.tags.length) {
+      tagsSection.style.display = 'flex';
+      tagsEl.innerHTML = node.tags.map(function(t) { return '<span class="tag-chip">' + t + '</span>'; }).join('');
+    } else {
+      tagsSection.style.display = 'none';
+    }
+
+    // Connections
+    var connected = allEdges.filter(function(e) {
+      var s = edgeSourceId(e);
+      var t = edgeTargetId(e);
+      return s === node.id || t === node.id;
+    }).map(function(e) {
+      var s = edgeSourceId(e);
+      var t = edgeTargetId(e);
+      return { id: s === node.id ? t : s, edgeType: e.type };
+    });
+
+    var uniqueConn = [];
+    var seen = {};
+    connected.forEach(function(c) {
+      if (!seen[c.id]) { seen[c.id] = true; uniqueConn.push(c); }
+    });
+
+    document.getElementById('dp-conn-count').textContent = '(' + uniqueConn.length + ')';
+    var connEl = document.getElementById('dp-connections');
+    if (uniqueConn.length) {
+      connEl.innerHTML = uniqueConn.slice(0, 20).map(function(c) {
+        var n2 = nodeById[c.id];
+        var lbl = n2 ? (n2.label || n2.id) : c.id;
+        return '<div class="conn-item" data-nodeid="' + c.id + '">' +
+          '<span class="ci-type">' + (c.edgeType || '').replace('_', ' ') + '</span>' +
+          lbl + '</div>';
+      }).join('');
+      connEl.querySelectorAll('.conn-item').forEach(function(el) {
+        el.addEventListener('click', function() {
+          var nid = el.getAttribute('data-nodeid');
+          var target = nodeById[nid];
+          if (target) { openDetailPanel(target); flyToNode(target); }
+        });
+      });
+    } else {
+      connEl.innerHTML = '<div style="color:var(--text-muted);font-size:12px;padding:4px">No connections in view</div>';
+    }
+
+    // Pre-fill recall input
+    document.getElementById('recall-input').value = node.label || '';
+    document.getElementById('recall-result').style.display = 'none';
+    document.getElementById('recall-result').textContent = '';
+
+    panel.classList.add('open');
+  }
+
+  function closeDetailPanel() {
+    document.getElementById('detail-panel').classList.remove('open');
+    selectedNode = null;
+  }
+
+  document.getElementById('dp-close').addEventListener('click', closeDetailPanel);
+
+  // ── Recall ─────────────────────────────────────────────────────────────────
+  document.getElementById('recall-btn').addEventListener('click', function() {
+    var q = document.getElementById('recall-input').value.trim();
+    if (!q) return;
+    var resultEl = document.getElementById('recall-result');
+    resultEl.style.display = 'block';
+    resultEl.textContent = '⚡ Recalling…';
+    fetch('/api/neural/recall?q=' + encodeURIComponent(q))
+      .then(function(r) { return r.json(); })
+      .then(function(d) { resultEl.textContent = d.result || d.error || 'No result'; })
+      .catch(function(e) { resultEl.textContent = 'Error: ' + e.message; });
+  });
+
+  document.getElementById('recall-input').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') document.getElementById('recall-btn').click();
+  });
+
+  // ── Search (MRI-style GPU highlight) ────────────────────────────────────
+  var runSearch = debounce(function(query) {
+    if (!graph) return;
+    searchQuery = query;
+    if (!searchQuery) {
+      searchMatchIds = null;
+      applySearchHighlight();
+      return;
+    }
+
+    // Find matching nodes
+    var directMatchIds = new Set();
+    for (var j = 0; j < allNodes.length; j++) {
+      var label = (allNodes[j].label || '').toLowerCase();
+      if (label.includes(searchQuery)) directMatchIds.add(allNodes[j].id);
+    }
+
+    // Expand to 1-hop neighbors
+    var activeIds = new Set(directMatchIds);
+    for (var e = 0; e < allEdges.length; e++) {
+      var edge = allEdges[e];
+      var srcId = edgeSourceId(edge);
+      var tgtId = edgeTargetId(edge);
+      if (directMatchIds.has(srcId)) activeIds.add(tgtId);
+      if (directMatchIds.has(tgtId)) activeIds.add(srcId);
+    }
+
+    searchMatchIds = activeIds;
+    applySearchHighlight();
+  }, 220);
+
+  document.getElementById('search-input').addEventListener('input', function() {
+    runSearch(this.value.trim().toLowerCase());
+  });
+
+  // ── Fullscreen ─────────────────────────────────────────────────────────────
+  document.getElementById('btn-fullscreen').addEventListener('click', function() {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen && document.documentElement.requestFullscreen();
+      this.textContent = '⊡';
+    } else {
+      document.exitFullscreen && document.exitFullscreen();
+      this.textContent = '⛶';
+    }
+  });
+
+  document.addEventListener('fullscreenchange', function() {
+    resizeLabelOverlay();
+    if (graph) {
+      if (document.fullscreenElement) {
+        graph.width(window.screen.width).height(window.screen.height);
+      } else {
+        graph.width(window.innerWidth).height(window.innerHeight);
+      }
+    }
+  });
+
+  window.addEventListener('resize', function() {
+    resizeLabelOverlay();
+    if (graph && !document.fullscreenElement) {
+      graph.width(window.innerWidth).height(window.innerHeight);
+    }
+  });
+
+  // ── Data fetch ─────────────────────────────────────────────────────────────
+  var isFirstLoad = true;
+
+  // Auto-detect device capability
+  function getDetailLevel() {
+    var w = window.innerWidth;
+    var isMobile = w < 768 || /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
+    var isTablet = w >= 768 && w < 1200;
+    if (isMobile) return 'low';
+    if (isTablet) return 'medium';
+    return 'high';
+  }
+
+  function fetchAndRender() {
+    var detail = getDetailLevel();
+    if (isFirstLoad) {
+      startLoadingMessages();
+      setLoadingProgress(5, null, 'Mode: ' + detail + ' — requesting neural data...');
+    }
+
+    fetch('/api/neural/graph?detail=' + detail)
+      .then(function(r) {
+        if (isFirstLoad) setLoadingProgress(20, 'Downloading neural topology...', 'Parsing response...');
+        return r.json();
+      })
+      .then(function(data) {
+        totalNodesBeforeFilter = (data.nodes || []).length;
+        totalEdgesBeforeFilter = (data.edges || []).length;
+
+        var filtered = filterToMostConnected(data.nodes || [], data.edges || [], MAX_VISIBLE_NODES);
+        allNodes = filtered.nodes;
+        allEdges = filtered.edges;
+        labelDistanceThreshold = getDetailLevel() === 'low' ? 560 : (getDetailLevel() === 'medium' ? 650 : 760);
+
+        if (isFirstLoad) {
+          var filterNote = totalNodesBeforeFilter > allNodes.length
+            ? 'Trimmed to top ' + allNodes.length.toLocaleString() + ' by degree (' + totalNodesBeforeFilter.toLocaleString() + ' total)'
+            : 'All nodes retained';
+          setLoadingProgress(35, 'Mapping ' + allNodes.length.toLocaleString() + ' neurons...', allEdges.length.toLocaleString() + ' synaptic connections found • ' + filterNote);
+        }
+
+        // Build index
+        nodeIndexMap = {};
+        nodeById = {};
+        for (var i = 0; i < allNodes.length; i++) {
+          nodeIndexMap[allNodes[i].id] = i;
+          nodeById[allNodes[i].id] = allNodes[i];
+        }
+        refreshLabelCandidates();
+
+        if (isFirstLoad) setLoadingProgress(45, 'Computing spatial layout...', 'Running fast force simulation');
+
+        // Feed to force graph for layout computation
+        graph.graphData({ nodes: allNodes, links: allEdges });
+        graph.d3ReheatSimulation();
+
+        // Simulate progress during warmup
+        if (isFirstLoad) {
+          var layoutWaitMs = getDetailLevel() === 'low' ? 250 : (getDetailLevel() === 'medium' ? 400 : 600);
+          var simProgress = 45;
+          var simInterval = setInterval(function() {
+            simProgress += 5;
+            if (simProgress < 78) {
+              setLoadingProgress(simProgress, null, 'Neurons finding their positions... ' + Math.round((simProgress - 45) / 35 * 100) + '%');
+            }
+          }, 100);
+
+          setTimeout(function() {
+            clearInterval(simInterval);
+            setLoadingProgress(80, 'Building GPU render buffers...', 'Preparing ' + allNodes.length.toLocaleString() + ' point vertices');
+
+            var scene = graph.scene();
+            buildPointsCloud(scene);
+
+            setLoadingProgress(90, 'Wiring ' + allEdges.length.toLocaleString() + ' synapses...', 'Almost there...');
+
+            setTimeout(function() {
+              buildEdgeLines(scene);
+              runSearch(searchQuery);
+              syncPositions(); // final sync — simulation may have already stopped
+              drawLabelsLOD();
+
+              // Force-stop simulation if still running
+              simulationActive = false;
+              graph.cooldownTicks(0);
+
+              setLoadingProgress(100, 'Neural network online! ⚡', allNodes.length.toLocaleString() + ' neurons • ' + renderedEdges.length.toLocaleString() + '/' + allEdges.length.toLocaleString() + ' synapses');
+
+              setTimeout(function() {
+                hideLoading();
+                isFirstLoad = false;
+              }, 600);
+
+              console.log('GPU buffers built: ' + allNodes.length + ' nodes, ' + renderedEdges.length + ' edges (of ' + allEdges.length + ' total)');
+            }, 200);
+          }, layoutWaitMs);
+        } else {
+          // Subsequent refreshes: briefly re-enable simulation then rebuild
+          simulationActive = true;
+          graph.cooldownTicks(8);
+          graph.d3ReheatSimulation();
+          setTimeout(function() {
+            var scene = graph.scene();
+            buildPointsCloud(scene);
+            buildEdgeLines(scene);
+            runSearch(searchQuery);
+            syncPositions();
+            drawLabelsLOD();
+            simulationActive = false;
+            graph.cooldownTicks(0);
+          }, 500);
+        }
+
+        // Stats
+        var s = data.stats || {};
+        var neuronStat = allNodes.length.toLocaleString();
+        var synapseStat = allEdges.length.toLocaleString();
+        if (totalNodesBeforeFilter > allNodes.length) neuronStat += ' / ' + totalNodesBeforeFilter.toLocaleString();
+        if (totalEdgesBeforeFilter > allEdges.length) synapseStat += ' / ' + totalEdgesBeforeFilter.toLocaleString();
+        document.getElementById('stat-neurons').textContent = neuronStat;
+        document.getElementById('stat-synapses').textContent = synapseStat;
+        document.getElementById('stat-fibers').textContent = (s.fibers || 0).toLocaleString();
+        if (s.lastTrained) {
+          var d = new Date(s.lastTrained);
+          document.getElementById('stat-trained').textContent = d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+        }
+      })
+      .catch(function(e) {
+        console.error('Neural graph fetch failed:', e);
+        if (isFirstLoad) {
+          setLoadingProgress(0, '❌ Failed to load neural data', e.message);
+          if (loadingInterval) clearInterval(loadingInterval);
+        }
+      });
+  }
+
+  // ── Hot Concepts panel ─────────────────────────────────────────────────────
+  var hcpPanel = document.getElementById('hot-concepts-panel');
+  var hcpHeader = document.getElementById('hcp-header');
+  var hcpBody = document.getElementById('hcp-body');
+  var hcpFooter = document.getElementById('hcp-footer');
+  var hcpActiveChip = null;
+
+  hcpHeader.addEventListener('click', function() {
+    hcpPanel.classList.toggle('collapsed');
+  });
+
+  function renderHotConcepts(concepts) {
+    if (!concepts || !concepts.length) {
+      hcpBody.innerHTML = '<div style="color:var(--text-muted);font-size:11px;padding:4px 2px">No concept data</div>';
+      hcpFooter.textContent = '';
+      return;
+    }
+    var maxFreq = Math.max.apply(null, concepts.map(function(c) { return c.freq || 0; })) || 1;
+    hcpBody.innerHTML = concepts.map(function(c, i) {
+      var pct = Math.max(8, Math.round(((c.freq || 0) / maxFreq) * 100));
+      var label = (c.label || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      return '<div class="hcp-chip" data-label="' + c.label.replace(/"/g,'&quot;') + '" title="' + label + ' (freq: ' + c.freq + ')">' +
+        '<span class="hcp-rank">' + (i + 1) + '</span>' +
+        '<span class="hcp-label">' + label + '</span>' +
+        '<div class="hcp-bar-wrap"><div class="hcp-bar" style="width:' + pct + '%"></div></div>' +
+        '</div>';
+    }).join('');
+
+    // Bind click → search highlight
+    hcpBody.querySelectorAll('.hcp-chip').forEach(function(chip) {
+      chip.addEventListener('click', function(e) {
+        e.stopPropagation();
+        var lbl = chip.getAttribute('data-label');
+        if (!lbl) return;
+        // Toggle: if already active, clear search
+        if (hcpActiveChip === chip) {
+          hcpActiveChip = null;
+          chip.classList.remove('active');
+          var si = document.getElementById('search-input');
+          if (si) { si.value = ''; si.dispatchEvent(new Event('input')); }
+          return;
+        }
+        if (hcpActiveChip) hcpActiveChip.classList.remove('active');
+        hcpActiveChip = chip;
+        chip.classList.add('active');
+        // Fire the existing search input
+        var searchEl = document.getElementById('search-input');
+        if (searchEl) {
+          searchEl.value = lbl;
+          searchEl.dispatchEvent(new Event('input'));
+        }
+      });
+    });
+
+    hcpFooter.textContent = concepts.length + ' concepts by access freq';
+  }
+
+  function loadHotConcepts() {
+    fetch('/api/neural/stats')
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        renderHotConcepts(d.topConcepts || []);
+      })
+      .catch(function() {
+        hcpBody.innerHTML = '<div style="color:var(--red);font-size:11px;padding:4px 2px">⚠ Failed to load</div>';
+      });
+  }
+
+  // Auto-clear active chip when user types in main search
+  var mainSearch = document.getElementById('search-input');
+  if (mainSearch) {
+    mainSearch.addEventListener('input', function() {
+      if (hcpActiveChip && mainSearch.value.trim() === '') {
+        hcpActiveChip.classList.remove('active');
+        hcpActiveChip = null;
+      }
+    });
+  }
+
+  loadHotConcepts();
+  setInterval(loadHotConcepts, 30000); // sync with graph refresh
+
+  // ── Boot ───────────────────────────────────────────────────────────────────
+  initLabelOverlay();
+  initGraph();
+  fetchAndRender();
+  setInterval(fetchAndRender, 30000);
+
+})();
+</script>
+</body>
+</html>
