@@ -64,9 +64,15 @@ function isSetupComplete() {
 
 // Auth middleware — protect everything except /login, /setup, and /api/auth/*
 function requireAuth(req, res, next) {
-  // Setup wizard — always accessible if setup not complete
+  // Always allow login and setup pages
+  if (req.path === '/login' || req.path === '/login.html') return next();
+  if (req.path === '/setup' || req.path === '/setup.html' || req.path.startsWith('/api/setup/')) {
+    if (!isSetupComplete()) return next();
+    // Setup complete — redirect setup page to login
+    return res.redirect('/login');
+  }
+  // Setup wizard — redirect everything if setup not complete
   if (!isSetupComplete()) {
-    if (req.path === '/setup' || req.path === '/setup.html' || req.path.startsWith('/api/setup/')) return next();
     if (req.path.startsWith('/api/')) return res.status(503).json({ error: 'Setup required', redirect: '/setup' });
     return res.redirect('/setup');
   }
