@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 const { execSync, spawn } = require('child_process');
 const fs = require('fs');
