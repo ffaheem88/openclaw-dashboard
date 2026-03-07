@@ -59,7 +59,7 @@ function requireAuth(req, res, next) {
 // GET /login
 app.get('/login', (req, res) => {
   if (req.session && req.session.authenticated) return res.redirect('/');
-  res.sendFile('login.html', { root: path.join(WORKSPACE, 'dashboard/public') });
+  res.sendFile('login.html', { root: path.join(__dirname, 'public') });
 });
 
 // POST /login
