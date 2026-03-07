@@ -41,7 +41,7 @@ const SVC_EXTRA = (process.env.SVC_EXTRA || 'searxng,ollama').split(',').map(s =
 const SESSIONS_DIR = path.join(OPENCLAW_HOME, 'agents', AGENT_NAME, 'sessions');
 const NEURAL_DB_PATH = require('path').resolve(require('os').homedir(), '.neuralmemory/brains/default.db');
 
-const AUTH_CONFIG_PATH = path.join(WORKSPACE, 'config/dashboard-auth.json');
+const AUTH_CONFIG_PATH = path.join(__dirname, 'config', 'dashboard-auth.json');
 function getAuthConfig() {
   try { return JSON.parse(fs.readFileSync(AUTH_CONFIG_PATH, 'utf8')); }
   catch { return { username: 'admin', passwordHash: '$2a$10$placeholder' }; }
@@ -54,8 +54,28 @@ app.use(session({
   cookie: { secure: false, maxAge: 24 * 60 * 60 * 1000 } // 24h
 }));
 
-// Auth middleware — protect everything except /login and /api/auth/*
+// Check if setup has been completed
+function isSetupComplete() {
+  try {
+    const cfg = JSON.parse(fs.readFileSync(AUTH_CONFIG_PATH, 'utf8'));
+    return cfg.passwordHash && cfg.passwordHash !== '$2a$10$placeholder';
+  } catch { return false; }
+}
+
+// Auth middleware — protect everything except /login, /setup, and /api/auth/*
 function requireAuth(req, res, next) {
+  // Always allow login and setup pages
+  if (req.path === '/login' || req.path === '/login.html') return next();
+  if (req.path === '/setup' || req.path === '/setup.html' || req.path.startsWith('/api/setup/')) {
+    if (!isSetupComplete()) return next();
+    // Setup complete — redirect setup page to login
+    return res.redirect('/login');
+  }
+  // Setup wizard — redirect everything if setup not complete
+  if (!isSetupComplete()) {
+    if (req.path.startsWith('/api/')) return res.status(503).json({ error: 'Setup required', redirect: '/setup' });
+    return res.redirect('/setup');
+  }
   if (req.session && req.session.authenticated) return next();
   // API routes return 401 JSON
   if (req.path.startsWith('/api/')) return res.status(401).json({ error: 'Unauthorized', redirect: '/login' });
@@ -2857,6 +2877,360 @@ app.post('/api/admin/clear-cache', express.json(), (req, res) => {
   res.json({ ok: true, keysCleared: keysBefore });
 });
 
+
+// ══════════════════════════════════════════════════════════════════════════
+// === Setup Wizard API =====================================================
+// ══════════════════════════════════════════════════════════════════════════
+
+// GET /api/setup/detect — auto-detect OpenClaw installation
+app.get('/api/setup/detect', (req, res) => {
+  const results = { openclawHome: null, agents: [], services: {}, installed: [] };
+
+  // Detect OpenClaw home
+  const candidates = [
+    path.resolve(os.homedir(), '.openclaw'),
+    '/root/.openclaw',
+    '/home/ubuntu/.openclaw'
+  ];
+  for (const c of candidates) {
+    if (fs.existsSync(c)) { results.openclawHome = c; break; }
+  }
+
+  // Detect agents
+  if (results.openclawHome) {
+    const agentsDir = path.join(results.openclawHome, 'agents');
+    try {
+      const dirs = fs.readdirSync(agentsDir, { withFileTypes: true })
+        .filter(d => d.isDirectory() && fs.existsSync(path.join(agentsDir, d.name, 'sessions')))
+        .map(d => d.name);
+      results.agents = dirs;
+    } catch {}
+  }
+
+  // Detect systemd services
+  try {
+    const units = execSync('systemctl list-units --type=service --all --no-legend 2>/dev/null', { encoding: 'utf8', timeout: 5000 });
+    const svcNames = units.split('\n').map(l => l.trim().split(/\s+/)[0]).filter(Boolean);
+
+    // Find dashboard service
+    const dashSvc = svcNames.find(s => s.includes('dashboard') && s.includes('openclaw'))
+      || svcNames.find(s => s.includes('dashboard') && s.includes('claw'))
+      || svcNames.find(s => s.includes('openclaw-dashboard'));
+    if (dashSvc) results.services.dashboard = dashSvc.replace('.service', '');
+
+    // Find tunnel service
+    const tunnelSvc = svcNames.find(s => s.includes('cloudflared'));
+    if (tunnelSvc) results.services.tunnel = tunnelSvc.replace('.service', '');
+
+    // Find extra services
+    const extras = [];
+    for (const name of ['searxng', 'ollama']) {
+      if (svcNames.find(s => s.includes(name))) extras.push(name);
+    }
+    if (extras.length) results.services.extra = extras.join(',');
+  } catch {}
+
+  // Detect installed tools
+  try { execSync('which nmem 2>/dev/null'); results.installed.push('neural'); } catch {}
+  try { execSync('which himalaya 2>/dev/null'); results.installed.push('mail'); } catch {}
+  try { execSync('which gh 2>/dev/null'); results.installed.push('github'); } catch {}
+  try { execSync('which cloudflared 2>/dev/null'); results.installed.push('tunnel'); } catch {}
+  try { execSync('which ollama 2>/dev/null'); results.installed.push('ollama'); } catch {}
+
+  res.json(results);
+});
+
+// POST /api/setup/validate — validate API keys
+app.post('/api/setup/validate', express.json(), async (req, res) => {
+  const { provider, key } = req.body || {};
+  if (!provider || !key) return res.json({ valid: false, error: 'Missing provider or key' });
+
+  try {
+    const https = require('https');
+    const http = require('http');
+    let valid = false;
+
+    if (provider === 'anthropic') {
+      const r = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
+        body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 1, messages: [{ role: 'user', content: 'hi' }] })
+      });
+      valid = r.status !== 401 && r.status !== 403;
+    } else if (provider === 'openrouter') {
+      const r = await fetch('https://openrouter.ai/api/v1/auth/key', {
+        headers: { 'Authorization': 'Bearer ' + key }
+      });
+      const data = await r.json();
+      valid = !!data.data;
+    } else if (provider === 'openai') {
+      const r = await fetch('https://api.openai.com/v1/models', {
+        headers: { 'Authorization': 'Bearer ' + key }
+      });
+      valid = r.status === 200;
+    }
+
+    res.json({ valid });
+  } catch (e) {
+    res.json({ valid: false, error: e.message });
+  }
+});
+
+// POST /api/setup/save — save configuration
+app.post('/api/setup/save', express.json(), (req, res) => {
+  const config = req.body;
+  if (!config) return res.json({ error: 'No config provided' });
+  if (!config.adminPass || config.adminPass.length < 4) return res.json({ error: 'Password too short' });
+
+  try {
+    // Write auth config
+    const configDir = path.join(__dirname, 'config');
+    if (!fs.existsSync(configDir)) fs.mkdirSync(configDir, { recursive: true });
+
+    const authConfig = {
+      username: config.adminUser || 'admin',
+      passwordHash: bcrypt.hashSync(config.adminPass, 10)
+    };
+    fs.writeFileSync(AUTH_CONFIG_PATH, JSON.stringify(authConfig, null, 2));
+
+    // Build .env content
+    const envLines = [
+      `PORT=${config.port || 3000}`,
+      `SESSION_SECRET=${require('crypto').randomBytes(32).toString('hex')}`,
+      `OPENCLAW_HOME=${config.openclawHome || ''}`,
+      `OPENCLAW_WORKSPACE=${config.openclawHome ? path.join(config.openclawHome, 'workspace') : ''}`,
+      `OPENCLAW_AGENT=${config.agentName || 'voice'}`,
+      '',
+      '# Features (comma-separated list of enabled features)',
+      `ENABLED_FEATURES=${['dashboard', 'costs', ...config.features].join(',')}`,
+      ''
+    ];
+
+    // API keys
+    if (config.keys) {
+      if (config.keys.anthropic) envLines.push(`ANTHROPIC_API_KEY=${config.keys.anthropic}`);
+      if (config.keys.openrouter) envLines.push(`OPENROUTER_API_KEY=${config.keys.openrouter}`);
+      if (config.keys.openai) envLines.push(`OPENAI_API_KEY=${config.keys.openai}`);
+      envLines.push('');
+    }
+
+    // VIS DB
+    if (config.features.includes('vis') && config.vis) {
+      envLines.push(`VIS_DB_HOST=${config.vis.host || ''}`);
+      envLines.push(`VIS_DB_PORT=${config.vis.port || 1433}`);
+      envLines.push(`VIS_DB_USER=${config.vis.user || ''}`);
+      envLines.push(`VIS_DB_PASS=${config.vis.pass || ''}`);
+      envLines.push(`VIS_DB_NAME=${config.vis.db || ''}`);
+      envLines.push('');
+    }
+
+    // Services
+    if (config.services) {
+      if (config.services.dashboard) envLines.push(`SVC_DASHBOARD=${config.services.dashboard}`);
+      if (config.services.tunnel) envLines.push(`SVC_TUNNEL=${config.services.tunnel}`);
+      if (config.services.extra) envLines.push(`SVC_EXTRA=${config.services.extra}`);
+    }
+
+    // Write dashboard config (features + non-secret settings)
+    const dashConfig = {
+      features: config.features,
+      setupComplete: true,
+      setupDate: new Date().toISOString()
+    };
+    fs.writeFileSync(path.join(configDir, 'dashboard-config.json'), JSON.stringify(dashConfig, null, 2));
+
+    // Write .env to dashboard directory
+    const envPath = path.join(__dirname, '.env');
+    fs.writeFileSync(envPath, envLines.join('\n') + '\n');
+
+    // Reload env vars in-process (no restart needed)
+    const envContent = require('dotenv').parse(fs.readFileSync(envPath));
+    for (const [key, val] of Object.entries(envContent)) {
+      process.env[key] = val;
+    }
+
+    // Auth config will be re-read on next request (getAuthConfig reads from disk)
+
+    res.json({ ok: true, restart: false });
+  } catch (e) {
+    res.json({ error: e.message });
+  }
+});
+
+// POST /api/setup/install — install optional dependencies
+app.post('/api/setup/install', express.json(), (req, res) => {
+  const { features = [], openclawHome } = req.body || {};
+  const steps = [];
+
+  for (const feat of features) {
+    if (feat === 'neural') {
+      // Install neural-memory
+      try {
+        execSync('which nmem 2>/dev/null');
+        steps.push({ ok: true, message: 'nmem already installed' });
+      } catch {
+        try {
+          execSync('pip install neural-memory 2>&1', { timeout: 120000 });
+          steps.push({ ok: true, message: 'neural-memory installed via pip' });
+        } catch (e) {
+          steps.push({ ok: false, message: 'Failed to install neural-memory: ' + e.message.substring(0, 200) });
+          continue;
+        }
+      }
+
+      // Init nmem if needed
+      const neuralDir = path.resolve(os.homedir(), '.neuralmemory');
+      if (!fs.existsSync(path.join(neuralDir, 'brains', 'default.db'))) {
+        try {
+          execSync('nmem init 2>&1', { timeout: 30000 });
+          steps.push({ ok: true, message: 'nmem initialized' });
+        } catch (e) {
+          steps.push({ ok: false, message: 'nmem init failed: ' + e.message.substring(0, 200) });
+        }
+      }
+
+      // Train if workspace exists
+      if (openclawHome) {
+        const workspace = path.join(openclawHome, 'workspace');
+        const memoryDir = path.join(workspace, 'memory');
+        const memoryMd = path.join(workspace, 'MEMORY.md');
+        const sources = [];
+        if (fs.existsSync(memoryDir)) sources.push('--source ' + memoryDir);
+        if (fs.existsSync(memoryMd)) sources.push('--source ' + memoryMd);
+        if (sources.length) {
+          try {
+            execSync(`nmem train ${sources.join(' ')} 2>&1`, { timeout: 300000 });
+            steps.push({ ok: true, message: 'nmem trained on workspace memory' });
+          } catch (e) {
+            steps.push({ ok: false, message: 'nmem train failed (non-critical): ' + e.message.substring(0, 200) });
+          }
+        }
+      }
+
+      // Set up cron
+      try {
+        const cronLine = `0 */4 * * * nmem train --source ${openclawHome}/workspace/memory/ --source ${openclawHome}/workspace/MEMORY.md >> /var/log/nmem-train.log 2>&1`;
+        const existing = execSync('crontab -l 2>/dev/null || true', { encoding: 'utf8' });
+        if (!existing.includes('nmem train')) {
+          execSync(`(crontab -l 2>/dev/null || true; echo "${cronLine}") | crontab -`);
+          steps.push({ ok: true, message: 'nmem 4-hour cron job added' });
+        } else {
+          steps.push({ ok: true, message: 'nmem cron already configured' });
+        }
+      } catch (e) {
+        steps.push({ ok: false, message: 'Failed to set up nmem cron: ' + e.message.substring(0, 100) });
+      }
+    }
+
+    if (feat === 'mail') {
+      try {
+        execSync('which himalaya 2>/dev/null');
+        steps.push({ ok: true, message: 'himalaya CLI already installed' });
+      } catch {
+        steps.push({ ok: false, message: 'himalaya not found — install manually: cargo install himalaya' });
+      }
+    }
+
+    if (feat === 'github') {
+      try {
+        execSync('which gh 2>/dev/null');
+        const authStatus = execSync('gh auth status 2>&1 || true', { encoding: 'utf8' });
+        if (authStatus.includes('Logged in')) {
+          steps.push({ ok: true, message: 'gh CLI authenticated' });
+        } else {
+          steps.push({ ok: false, message: 'gh CLI installed but not authenticated — run: gh auth login' });
+        }
+      } catch {
+        steps.push({ ok: false, message: 'gh CLI not found — install: https://cli.github.com' });
+      }
+    }
+  }
+
+  res.json({ steps });
+});
+
+// GET /api/setup/health — post-setup health check
+app.get('/api/setup/health', (req, res) => {
+  const checks = [];
+
+  // OpenClaw process
+  try {
+    const pid = execSync('pgrep -f "openclaw" 2>/dev/null || true', { encoding: 'utf8' }).trim();
+    checks.push({
+      name: 'OpenClaw Process',
+      status: pid ? 'ok' : 'warn',
+      detail: pid ? `PID ${pid.split('\n')[0]}` : 'Not detected'
+    });
+  } catch { checks.push({ name: 'OpenClaw Process', status: 'error', detail: 'Check failed' }); }
+
+  // Session directory — use env var (may have been updated by setup/save)
+  const currentHome = process.env.OPENCLAW_HOME || OPENCLAW_HOME;
+  const currentAgent = process.env.OPENCLAW_AGENT || AGENT_NAME;
+  const sessDir = path.join(currentHome, 'agents', currentAgent, 'sessions');
+  checks.push({
+    name: 'Session Directory',
+    status: fs.existsSync(sessDir) ? 'ok' : 'error',
+    detail: fs.existsSync(sessDir) ? sessDir : 'Not found: ' + sessDir
+  });
+
+  // Workspace
+  const currentWorkspace = process.env.OPENCLAW_WORKSPACE || WORKSPACE;
+  checks.push({
+    name: 'Workspace',
+    status: fs.existsSync(currentWorkspace) ? 'ok' : 'error',
+    detail: fs.existsSync(currentWorkspace) ? currentWorkspace : 'Not found'
+  });
+
+  // Neural memory
+  const neuralPath = path.resolve(os.homedir(), '.neuralmemory/brains/default.db');
+  try {
+    execSync('which nmem 2>/dev/null');
+    checks.push({
+      name: 'Neural Memory',
+      status: fs.existsSync(neuralPath) ? 'ok' : 'warn',
+      detail: fs.existsSync(neuralPath) ? 'Trained & ready' : 'Installed but not trained'
+    });
+  } catch {
+    checks.push({ name: 'Neural Memory', status: 'warn', detail: 'Not installed (optional)' });
+  }
+
+  // Disk space
+  try {
+    const df = execSync("df -h / | tail -1 | awk '{print $5}'", { encoding: 'utf8' }).trim();
+    const pct = parseInt(df);
+    checks.push({
+      name: 'Disk Usage',
+      status: pct > 90 ? 'error' : pct > 75 ? 'warn' : 'ok',
+      detail: df + ' used'
+    });
+  } catch { checks.push({ name: 'Disk Usage', status: 'warn', detail: 'Could not check' }); }
+
+  // Memory
+  try {
+    const memInfo = execSync("free -m | awk 'NR==2{printf \"%d/%dMB (%.0f%%)\", $3,$2,$3*100/$2}'", { encoding: 'utf8' }).trim();
+    const pct = parseInt(memInfo.match(/\((\d+)%\)/)?.[1] || '0');
+    checks.push({
+      name: 'Memory',
+      status: pct > 90 ? 'error' : pct > 75 ? 'warn' : 'ok',
+      detail: memInfo
+    });
+  } catch { checks.push({ name: 'Memory', status: 'warn', detail: 'Could not check' }); }
+
+  // Config files
+  checks.push({
+    name: 'Dashboard Config',
+    status: isSetupComplete() ? 'ok' : 'error',
+    detail: isSetupComplete() ? 'Configured' : 'Not configured'
+  });
+
+  res.json({ checks });
+});
+
+// GET /setup — serve setup wizard
+app.get('/setup', (req, res) => {
+  if (isSetupComplete()) return res.redirect('/login');
+  res.sendFile('setup.html', { root: path.join(__dirname, 'public') });
+});
 
 // ── Virtual host routing ──────────────────────────────────────────────────
 // (ARC website routing is above requireAuth — see line ~90)
