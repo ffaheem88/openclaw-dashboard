@@ -34,6 +34,9 @@ const PORT = 3000;
 const WORKSPACE = process.env.OPENCLAW_WORKSPACE || path.resolve(os.homedir(), '.openclaw/workspace');
 const OPENCLAW_HOME = process.env.OPENCLAW_HOME || path.resolve(os.homedir(), '.openclaw');
 const AGENT_NAME = process.env.OPENCLAW_AGENT || 'voice';
+const SVC_DASHBOARD = process.env.SVC_DASHBOARD || 'clawdbot-dashboard';
+const SVC_TUNNEL = process.env.SVC_TUNNEL || 'cloudflared-dashboard';
+const SVC_EXTRA = (process.env.SVC_EXTRA || 'searxng,ollama').split(',').map(s => s.trim()).filter(Boolean);
 const SESSIONS_DIR = path.join(OPENCLAW_HOME, 'agents', AGENT_NAME, 'sessions');
 const NEURAL_DB_PATH = require('path').resolve(require('os').homedir(), '.neuralmemory/brains/default.db');
 
@@ -140,10 +143,13 @@ let neuralGraphCache = {};
 let neuralDb;
 function getNeuralDb() {
   if (!neuralDb) {
-    if (!fs.existsSync(NEURAL_DB_PATH)) {
-      throw new Error(`Neural DB not found at ${NEURAL_DB_PATH}`);
+    if (!fs.existsSync(NEURAL_DB_PATH)) return null;
+    try {
+      neuralDb = new Database(NEURAL_DB_PATH, { readonly: true });
+    } catch (e) {
+      console.error('[neural] Failed to open DB:', e.message);
+      return null;
     }
-    neuralDb = new Database(NEURAL_DB_PATH, { readonly: true });
   }
   return neuralDb;
 }
@@ -401,7 +407,7 @@ app.get('/api/activity', (req, res) => {
   
   // Live: systemd service statuses
   const services = {};
-  for (const svc of ['clawdbot-dashboard', 'cloudflared-dashboard', 'searxng', 'ollama']) {
+  for (const svc of [SVC_DASHBOARD, SVC_TUNNEL, ...SVC_EXTRA]) {
     const status = exec(`systemctl is-active ${svc} 2>/dev/null`, 'unknown');
     const since = exec(`systemctl show ${svc} --property=ActiveEnterTimestamp --value 2>/dev/null`);
     services[svc] = { status, since };
@@ -2106,7 +2112,7 @@ app.get('/api/health/providers', async (req, res) => {
 });
 
 // API: log tail
-const ALLOWED_SERVICES = ['openclaw', 'clawdbot-dashboard', 'cloudflared-dashboard', 'searxng', 'ollama'];
+const ALLOWED_SERVICES = ['openclaw', 'openclaw-gateway', SVC_DASHBOARD, SVC_TUNNEL, ...SVC_EXTRA];
 app.get('/api/logs/tail', (req, res) => {
   const lines = Math.min(Math.max(parseInt(req.query.lines) || 50, 1), 500);
   const service = req.query.service || 'openclaw';
@@ -2152,6 +2158,7 @@ app.get('/api/neural/graph', (req, res) => {
     const lim = limits[detail] || limits.auto;
 
     const db = getNeuralDb();
+    if (!db) return res.json({ fibers: [], neurons: [], synapses: [], unavailable: true });
 
     const fibers = db.prepare(`
       SELECT id, summary, tags, salience, conductivity, coherence
@@ -2337,6 +2344,7 @@ app.get('/api/neural/stats', (req, res) => {
 
   try {
     const db = getNeuralDb();
+    if (!db) return res.json({ neurons: 0, synapses: 0, fibers: 0, topConcepts: [], lastTrained: null, unavailable: true });
     const counts = db.prepare(`
       SELECT
         (SELECT COUNT(*) FROM neurons) AS neurons,
@@ -2781,7 +2789,7 @@ app.get('/api/network/status', (req, res) => {
   const TUNNEL_ID = 'fa824c5c-59d3-4bb7-b84e-ba4ba35e98b7'; // from TOOLS.md
 
   // 1. cloudflared-dashboard service state
-  const tunnelActive = exec('systemctl show cloudflared-dashboard --property=ActiveState --value 2>/dev/null', 'unknown').trim();
+  const tunnelActive = exec(`systemctl show ${SVC_TUNNEL} --property=ActiveState --value 2>/dev/null`, 'unknown').trim();
 
   // 2. Is port 3000 actually listening?
   const portOut = exec('ss -ltn 2>/dev/null | grep ":3000 "', '');
