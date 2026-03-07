@@ -32,6 +32,9 @@ function pushMetricsSample(cpuLoad, memPct) {
 const app = express();
 const PORT = 3000;
 const WORKSPACE = process.env.OPENCLAW_WORKSPACE || path.resolve(os.homedir(), '.openclaw/workspace');
+const OPENCLAW_HOME = process.env.OPENCLAW_HOME || path.resolve(os.homedir(), '.openclaw');
+const AGENT_NAME = process.env.OPENCLAW_AGENT || 'voice';
+const SESSIONS_DIR = path.join(OPENCLAW_HOME, 'agents', AGENT_NAME, 'sessions');
 const NEURAL_DB_PATH = require('path').resolve(require('os').homedir(), '.neuralmemory/brains/default.db');
 
 const AUTH_CONFIG_PATH = path.join(WORKSPACE, 'config/dashboard-auth.json');
@@ -341,7 +344,7 @@ app.get('/api/activity', (req, res) => {
   const yesterdayLog = readFile(path.join(memDir, `${yesterday}.md`));
   
   // Live: recent sessions (last 24h)
-  const sessDir = path.join(process.env.OPENCLAW_HOME || path.resolve(os.homedir(), '.openclaw'), 'agents/voice/sessions');
+  const sessDir = SESSIONS_DIR;
   const recentSessions = [];
   try {
     // Load sessions index for labels
@@ -431,7 +434,7 @@ app.get('/api/activity/feed', (req, res) => {
   const hit = cache.get(cacheKey);
   if (hit) return res.json(hit);
 
-  const sessDir = path.join(process.env.OPENCLAW_HOME || path.resolve(os.homedir(), '.openclaw'), 'agents/voice/sessions');
+  const sessDir = SESSIONS_DIR;
   const tailCount = Math.max(limit * 2, 200);
 
   try {
@@ -562,7 +565,7 @@ app.get('/api/stats/today', (req, res) => {
     }
 
     // Light fallback: count session files by mtime only (no file reads)
-    const sessDir = path.join(process.env.OPENCLAW_HOME || path.resolve(os.homedir(), '.openclaw'), 'agents/voice/sessions');
+    const sessDir = SESSIONS_DIR;
     let todayCount = 0, weekCount = 0;
     try {
       const files = fs.readdirSync(sessDir).filter(f => f.endsWith('.jsonl') && !f.includes('.deleted.'));
@@ -825,7 +828,7 @@ function extractSessionError(lines) {
 app.get('/api/orchestration/sessions', (req, res) => {
   const hit = cache.get('orch_sessions');
   if (hit) return res.json(hit);
-  const sessDir = path.join(process.env.OPENCLAW_HOME || path.resolve(os.homedir(), '.openclaw'), 'agents/voice/sessions');
+  const sessDir = SESSIONS_DIR;
   try {
     const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
     const scanTime = Date.now();
@@ -971,7 +974,7 @@ app.get('/api/orchestration/sessions', (req, res) => {
 app.get('/api/orchestration/tree', (req, res) => {
   const hit = cache.get('orch_tree');
   if (hit) return res.json(hit);
-  const sessDir = path.join(process.env.OPENCLAW_HOME || path.resolve(os.homedir(), '.openclaw'), 'agents/voice/sessions');
+  const sessDir = SESSIONS_DIR;
   try {
     const sessStorePath = path.join(sessDir, 'sessions.json');
     const sessIdx = JSON.parse(fs.readFileSync(sessStorePath, 'utf8'));
@@ -1118,7 +1121,7 @@ app.get('/api/orchestration/crons', (req, res) => {
 app.get('/api/orchestration/session/:id/error', (req, res) => {
   // Validate: session IDs are UUIDs or alphanumeric (no path traversal)
   if (!/^[a-zA-Z0-9_-]{4,80}$/.test(req.params.id)) return res.status(400).json({ error: 'Invalid session ID' });
-  const sessFile = path.join(path.join(process.env.OPENCLAW_HOME || path.resolve(os.homedir(), '.openclaw'), 'agents/voice/sessions'), req.params.id + '.jsonl');
+  const sessFile = path.join(SESSIONS_DIR, req.params.id + '.jsonl');
   if (!fs.existsSync(sessFile)) return res.json({ error: 'Session not found' });
   
   const lines = fs.readFileSync(sessFile, 'utf8').trim().split('\n');
@@ -1180,7 +1183,7 @@ app.get('/api/orchestration/session/:id/error', (req, res) => {
 // API: orchestration - session detail (transcript summary)
 app.get('/api/orchestration/session/:id', (req, res) => {
   if (!/^[a-zA-Z0-9_-]{4,80}$/.test(req.params.id)) return res.status(400).json({ error: 'Invalid session ID' });
-  const sessFile = path.join(path.join(process.env.OPENCLAW_HOME || path.resolve(os.homedir(), '.openclaw'), 'agents/voice/sessions'), req.params.id + '.jsonl');
+  const sessFile = path.join(SESSIONS_DIR, req.params.id + '.jsonl');
   if (!fs.existsSync(sessFile)) return res.json({ error: 'Session not found' });
   
   const lines = fs.readFileSync(sessFile, 'utf8').trim().split('\n');
@@ -1282,7 +1285,7 @@ app.post('/api/orchestration/kill', express.json(), (req, res) => {
   }
   
   try {
-    const sessStore = path.join(path.join(process.env.OPENCLAW_HOME || path.resolve(os.homedir(), '.openclaw'), 'agents/voice/sessions'), 'sessions.json');
+    const sessStore = path.join(SESSIONS_DIR, 'sessions.json');
     let sessIndex = {};
     try { sessIndex = JSON.parse(fs.readFileSync(sessStore, 'utf8')); } catch {}
     
@@ -1293,7 +1296,7 @@ app.post('/api/orchestration/kill', express.json(), (req, res) => {
     }
     
     const sessionId = entry.sessionId;
-    const sessionFile = path.join(path.join(process.env.OPENCLAW_HOME || path.resolve(os.homedir(), '.openclaw'), 'agents/voice/sessions'), sessionId + '.jsonl');
+    const sessionFile = path.join(SESSIONS_DIR, sessionId + '.jsonl');
     
     // Rename session file to mark as deleted/aborted
     if (fs.existsSync(sessionFile)) {
@@ -1316,7 +1319,7 @@ app.get('/api/orchestration/live', (req, res) => {
   const hit = cache.get('orch_live');
   if (hit) return res.json(hit);
   // Load sessions index for resolving truncated keys
-  const sessStore = path.join(path.join(process.env.OPENCLAW_HOME || path.resolve(os.homedir(), '.openclaw'), 'agents/voice/sessions'), 'sessions.json');
+  const sessStore = path.join(SESSIONS_DIR, 'sessions.json');
   let sessIndex = {};
   try { sessIndex = JSON.parse(fs.readFileSync(sessStore, 'utf8')); } catch {}
   const fullKeys = Object.keys(sessIndex);
@@ -1363,7 +1366,7 @@ app.get('/api/orchestration/live', (req, res) => {
     const sessEntry = sessIndex[key];
     const sessId = sessEntry?.sessionId || key.split(':')[key.split(':').length - 1];
     if (sessId && sessId !== 'main') {
-      const transcriptPath = path.join(path.join(process.env.OPENCLAW_HOME || path.resolve(os.homedir(), '.openclaw'), 'agents/voice/sessions'), sessId + '.jsonl');
+      const transcriptPath = path.join(SESSIONS_DIR, sessId + '.jsonl');
       try {
         const transcript = fs.readFileSync(transcriptPath, 'utf8').trim();
         const lines = transcript.split('\n');
@@ -1466,7 +1469,7 @@ app.get('/api/orchestration/live', (req, res) => {
       // Try to find label from transcript first line
       const sessId = entry?.sessionId || item.key.split(':subagent:')[1];
       if (sessId && !entry?.label) {
-        const transcriptPath = path.join(path.join(process.env.OPENCLAW_HOME || path.resolve(os.homedir(), '.openclaw'), 'agents/voice/sessions'), sessId + '.jsonl');
+        const transcriptPath = path.join(SESSIONS_DIR, sessId + '.jsonl');
         try {
           const firstLines = fs.readFileSync(transcriptPath, 'utf8').split('\n').slice(0, 3);
           for (const l of firstLines) {
@@ -1505,7 +1508,7 @@ app.get('/api/orchestration/live', (req, res) => {
 app.get('/api/orchestration/tools-summary', (req, res) => {
   const hit = cache.get('orch_tools_summary');
   if (hit) return res.json(hit);
-  const sessDir = path.join(process.env.OPENCLAW_HOME || path.resolve(os.homedir(), '.openclaw'), 'agents/voice/sessions');
+  const sessDir = SESSIONS_DIR;
   try {
     const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
     const now = Date.now();
@@ -1907,7 +1910,7 @@ app.get('/api/costs/summary', (req, res) => {
   if (hit) return res.json(hit);
   try {
     const sessionDirs = [
-      path.join(process.env.OPENCLAW_HOME || path.resolve(os.homedir(), '.openclaw'), 'agents/voice/sessions'),
+      SESSIONS_DIR,
       '' + (process.env.OPENCLAW_HOME || path.resolve(os.homedir(), '.openclaw')) + '/cron/runs'
     ];
 
@@ -2002,7 +2005,7 @@ app.get('/api/costs/by-model', (req, res) => {
   if (hit) return res.json(hit);
   try {
     const sessionDirs = [
-      path.join(process.env.OPENCLAW_HOME || path.resolve(os.homedir(), '.openclaw'), 'agents/voice/sessions'),
+      SESSIONS_DIR,
       '' + (process.env.OPENCLAW_HOME || path.resolve(os.homedir(), '.openclaw')) + '/cron/runs'
     ];
     const now = Date.now();
@@ -2389,7 +2392,7 @@ app.get('/api/sessions/hourly', (req, res) => {
   if (hit) return res.json(hit);
 
   try {
-    const sessDir = path.join(process.env.OPENCLAW_HOME || path.resolve(os.homedir(), '.openclaw'), 'agents/voice/sessions');
+    const sessDir = SESSIONS_DIR;
     const now = Date.now();
     const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
 
@@ -2470,7 +2473,7 @@ app.get('/api/sessions/errors-summary', (req, res) => {
   if (hit) return res.json(hit);
 
   try {
-    const sessDir = path.join(process.env.OPENCLAW_HOME || path.resolve(os.homedir(), '.openclaw'), 'agents/voice/sessions');
+    const sessDir = SESSIONS_DIR;
     const now = Date.now();
     const oneDayMs = 24 * 60 * 60 * 1000;
 
@@ -2823,7 +2826,7 @@ app.get('/api/admin/cache-stats', (req, res) => {
   })).filter(e => !e.expired);
 
   const diskWorkspace = exec(`du -sh ${WORKSPACE} 2>/dev/null | cut -f1`, '?');
-  const diskSessions = exec(`du -sh ' + (process.env.OPENCLAW_HOME || path.resolve(os.homedir(), '.openclaw')) + '/agents/voice/sessions 2>/dev/null | cut -f1`, '?');
+  const diskSessions = exec(`du -sh ' + SESSIONS_DIR + ' 2>/dev/null | cut -f1`, '?');
   const diskNeural   = exec(`du -sh ' + os.homedir() + '/.neuralmemory 2>/dev/null | cut -f1`, '?');
   const processMemMb = (process.memoryUsage().rss / 1024 / 1024).toFixed(1);
 
