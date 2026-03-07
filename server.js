@@ -3015,6 +3015,84 @@ app.post('/api/setup/validate', express.json(), async (req, res) => {
   }
 });
 
+// ── Settings API (post-setup config management) ────────────────────────
+// Helper: read/write .env as key-value pairs
+function readEnvFile() {
+  try {
+    const envPath = path.join(__dirname, '.env');
+    const content = fs.readFileSync(envPath, 'utf8');
+    const env = {};
+    for (const line of content.split('\n')) {
+      if (!line.trim() || line.startsWith('#')) continue;
+      const eq = line.indexOf('=');
+      if (eq > 0) env[line.substring(0, eq)] = line.substring(eq + 1);
+    }
+    return env;
+  } catch { return {}; }
+}
+
+function writeEnvFile(env) {
+  const envPath = path.join(__dirname, '.env');
+  const lines = [];
+  for (const [key, val] of Object.entries(env)) {
+    if (val !== undefined && val !== null) lines.push(`${key}=${val}`);
+  }
+  fs.writeFileSync(envPath, lines.join('\n') + '\n');
+  // Reload in-process
+  for (const [key, val] of Object.entries(env)) {
+    if (val) process.env[key] = val;
+  }
+}
+
+// POST /api/settings/keys — update API keys
+app.post('/api/settings/keys', express.json(), requireAuth, (req, res) => {
+  try {
+    const env = readEnvFile();
+    const { anthropic, openrouter, openai } = req.body || {};
+    if (anthropic) env.ANTHROPIC_API_KEY = anthropic;
+    if (openrouter) env.OPENROUTER_API_KEY = openrouter;
+    if (openai) env.OPENAI_API_KEY = openai;
+    writeEnvFile(env);
+    res.json({ ok: true });
+  } catch (e) { res.json({ error: e.message }); }
+});
+
+// POST /api/settings/general — update paths and service names
+app.post('/api/settings/general', express.json(), requireAuth, (req, res) => {
+  try {
+    const env = readEnvFile();
+    const { openclawHome, agentName, svcDashboard, svcTunnel, svcExtra } = req.body || {};
+    if (openclawHome) { env.OPENCLAW_HOME = openclawHome; env.OPENCLAW_WORKSPACE = path.join(openclawHome, 'workspace'); }
+    if (agentName) env.OPENCLAW_AGENT = agentName;
+    if (svcDashboard) env.SVC_DASHBOARD = svcDashboard;
+    if (svcTunnel) env.SVC_TUNNEL = svcTunnel;
+    if (svcExtra !== undefined) env.SVC_EXTRA = svcExtra;
+    writeEnvFile(env);
+    res.json({ ok: true });
+  } catch (e) { res.json({ error: e.message }); }
+});
+
+// POST /api/settings/features — update enabled features + install
+app.post('/api/settings/features', express.json(), requireAuth, (req, res) => {
+  try {
+    const { features = [] } = req.body || {};
+    const env = readEnvFile();
+    env.ENABLED_FEATURES = ['dashboard', 'costs', ...features].join(',');
+    writeEnvFile(env);
+
+    // Update dashboard config
+    const configDir = path.join(__dirname, 'config');
+    if (!fs.existsSync(configDir)) fs.mkdirSync(configDir, { recursive: true });
+    const dashConfigPath = path.join(configDir, 'dashboard-config.json');
+    let dashConfig = {};
+    try { dashConfig = JSON.parse(fs.readFileSync(dashConfigPath, 'utf8')); } catch {}
+    dashConfig.features = features;
+    fs.writeFileSync(dashConfigPath, JSON.stringify(dashConfig, null, 2));
+
+    res.json({ ok: true, features });
+  } catch (e) { res.json({ error: e.message }); }
+});
+
 // POST /api/setup/save — save configuration
 app.post('/api/setup/save', express.json(), (req, res) => {
   const config = req.body;

@@ -940,6 +940,90 @@ body::before{
     </div>
   </div>
 
+  <!-- General Configuration -->
+  <div class="section fade-in" style="margin-top:24px">
+    <div class="section-title">🔑 API Keys</div>
+    <p class="section-desc">Manage your LLM provider API keys. Changes take effect after save.</p>
+    <div style="max-width:500px;margin-top:16px" id="apiKeysSection">
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <div>
+          <label style="display:block;font-size:12px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">
+            Anthropic API Key <span id="keyStatusAnthropic" style="font-size:11px;font-weight:400"></span>
+          </label>
+          <input type="password" id="cfg-key-anthropic" placeholder="sk-ant-..."
+            style="width:100%;padding:10px 14px;background:rgba(255,255,255,.05);border:1px solid var(--glass-border);border-radius:10px;color:var(--text-primary);font-family:inherit;font-size:14px;outline:none">
+        </div>
+        <div>
+          <label style="display:block;font-size:12px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">
+            OpenRouter API Key <span id="keyStatusOpenRouter" style="font-size:11px;font-weight:400"></span>
+          </label>
+          <input type="password" id="cfg-key-openrouter" placeholder="sk-or-..."
+            style="width:100%;padding:10px 14px;background:rgba(255,255,255,.05);border:1px solid var(--glass-border);border-radius:10px;color:var(--text-primary);font-family:inherit;font-size:14px;outline:none">
+        </div>
+        <div>
+          <label style="display:block;font-size:12px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">
+            OpenAI API Key <span id="keyStatusOpenAI" style="font-size:11px;font-weight:400"></span>
+          </label>
+          <input type="password" id="cfg-key-openai" placeholder="sk-..."
+            style="width:100%;padding:10px 14px;background:rgba(255,255,255,.05);border:1px solid var(--glass-border);border-radius:10px;color:var(--text-primary);font-family:inherit;font-size:14px;outline:none">
+        </div>
+      </div>
+      <button onclick="saveApiKeys()" style="margin-top:14px;padding:10px 20px;background:linear-gradient(135deg,#06b6d4,#8b5cf6);border:none;border-radius:10px;color:#fff;font-family:inherit;font-size:14px;font-weight:600;cursor:pointer">
+        Save API Keys
+      </button>
+      <div id="apikeys-msg" style="display:none;font-size:13px;padding:10px 14px;border-radius:8px;margin-top:10px"></div>
+    </div>
+  </div>
+
+  <div class="section fade-in" style="margin-top:24px">
+    <div class="section-title">⚙️ General Configuration</div>
+    <p class="section-desc">Dashboard paths and service names. Changes require restart.</p>
+    <div style="max-width:500px;margin-top:16px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+        <div>
+          <label style="display:block;font-size:12px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">OpenClaw Home</label>
+          <input type="text" id="cfg-home" placeholder="~/.openclaw"
+            style="width:100%;padding:10px 14px;background:rgba(255,255,255,.05);border:1px solid var(--glass-border);border-radius:10px;color:var(--text-primary);font-family:inherit;font-size:14px;outline:none">
+        </div>
+        <div>
+          <label style="display:block;font-size:12px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Agent Name</label>
+          <input type="text" id="cfg-agent" placeholder="voice"
+            style="width:100%;padding:10px 14px;background:rgba(255,255,255,.05);border:1px solid var(--glass-border);border-radius:10px;color:var(--text-primary);font-family:inherit;font-size:14px;outline:none">
+        </div>
+        <div>
+          <label style="display:block;font-size:12px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Dashboard Service</label>
+          <input type="text" id="cfg-svc-dash" placeholder="openclaw-dashboard"
+            style="width:100%;padding:10px 14px;background:rgba(255,255,255,.05);border:1px solid var(--glass-border);border-radius:10px;color:var(--text-primary);font-family:inherit;font-size:14px;outline:none">
+        </div>
+        <div>
+          <label style="display:block;font-size:12px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Tunnel Service</label>
+          <input type="text" id="cfg-svc-tunnel" placeholder="cloudflared"
+            style="width:100%;padding:10px 14px;background:rgba(255,255,255,.05);border:1px solid var(--glass-border);border-radius:10px;color:var(--text-primary);font-family:inherit;font-size:14px;outline:none">
+        </div>
+      </div>
+      <div style="margin-top:14px">
+        <label style="display:block;font-size:12px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Extra Services (comma-separated)</label>
+        <input type="text" id="cfg-svc-extra" placeholder="searxng,ollama"
+          style="width:100%;padding:10px 14px;background:rgba(255,255,255,.05);border:1px solid var(--glass-border);border-radius:10px;color:var(--text-primary);font-family:inherit;font-size:14px;outline:none">
+      </div>
+      <button onclick="saveGeneralConfig()" style="margin-top:14px;padding:10px 20px;background:linear-gradient(135deg,#06b6d4,#8b5cf6);border:none;border-radius:10px;color:#fff;font-family:inherit;font-size:14px;font-weight:600;cursor:pointer">
+        Save & Restart
+      </button>
+      <div id="general-msg" style="display:none;font-size:13px;padding:10px 14px;border-radius:8px;margin-top:10px"></div>
+    </div>
+  </div>
+
+  <div class="section fade-in" style="margin-top:24px">
+    <div class="section-title">🧩 Features</div>
+    <p class="section-desc">Enable or disable optional dashboard features.</p>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;margin-top:16px" id="featureToggles">
+    </div>
+    <button onclick="saveFeatures()" style="margin-top:14px;padding:10px 20px;background:linear-gradient(135deg,#06b6d4,#8b5cf6);border:none;border-radius:10px;color:#fff;font-family:inherit;font-size:14px;font-weight:600;cursor:pointer">
+      Save Features
+    </button>
+    <div id="features-msg" style="display:none;font-size:13px;padding:10px 14px;border-radius:8px;margin-top:10px"></div>
+  </div>
+
   <div class="section fade-in" style="margin-top:24px">
     <div class="section-title">🔒 Security</div>
     <p class="section-desc">Change your dashboard login password.</p>
@@ -1151,6 +1235,128 @@ async function loadNetworkStatus(){
 }
 loadNetworkStatus();
 setInterval(loadNetworkStatus,30000);
+// ── API Keys Management ──────────────────────────────────
+function loadCurrentConfig() {
+  fetch('/api/setup/detect').then(r=>r.json()).then(function(data) {
+    // API keys
+    if (data.keys) {
+      ['anthropic','openrouter','openai'].forEach(function(p) {
+        var input = document.getElementById('cfg-key-' + p);
+        var status = document.getElementById('keyStatus' + p.charAt(0).toUpperCase() + p.slice(1));
+        if (data.keys[p] && data.keys[p].detected) {
+          input.placeholder = 'Configured: ' + data.keys[p].masked;
+          status.innerHTML = ' <span style="color:#10b981">✓ active</span>';
+        }
+      });
+    }
+    // General config
+    if (data.openclawHome) document.getElementById('cfg-home').value = data.openclawHome;
+    if (data.agents && data.agents.length) {
+      // Try to figure out which agent is active
+      document.getElementById('cfg-agent').placeholder = data.agents.join(', ');
+    }
+    if (data.services) {
+      if (data.services.dashboard) document.getElementById('cfg-svc-dash').value = data.services.dashboard;
+      if (data.services.tunnel) document.getElementById('cfg-svc-tunnel').value = data.services.tunnel;
+      if (data.services.extra) document.getElementById('cfg-svc-extra').value = data.services.extra;
+    }
+    // Features
+    var featureList = [
+      {id:'neural', icon:'🧠', name:'Neural Memory', desc:'Memory graph & recall'},
+      {id:'mail', icon:'📧', name:'Email Inbox', desc:'Agent email viewer'},
+      {id:'github', icon:'🐙', name:'GitHub', desc:'Commits & repo status'},
+      {id:'vis', icon:'🗄️', name:'SQL Database', desc:'External DB stats'},
+      {id:'tunnel', icon:'🌐', name:'Cloudflare Tunnel', desc:'Tunnel monitoring'},
+      {id:'ollama', icon:'🦙', name:'Local LLM', desc:'Ollama health check'}
+    ];
+    var installed = data.installed || [];
+    var container = document.getElementById('featureToggles');
+    container.innerHTML = '';
+    featureList.forEach(function(f) {
+      var isInstalled = installed.includes(f.id);
+      var div = document.createElement('div');
+      div.style.cssText = 'background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:14px;cursor:pointer;transition:all .2s';
+      div.innerHTML = '<label style="display:flex;align-items:center;gap:10px;cursor:pointer">' +
+        '<input type="checkbox" name="feat" value="' + f.id + '"' + (isInstalled ? ' checked' : '') +
+        ' style="width:18px;height:18px;accent-color:#06b6d4">' +
+        '<div><div style="font-size:14px;font-weight:600">' + f.icon + ' ' + f.name + '</div>' +
+        '<div style="font-size:11px;color:var(--text-secondary)">' + f.desc +
+        (isInstalled ? ' <span style="color:#10b981">✓ installed</span>' : '') +
+        '</div></div></label>';
+      container.appendChild(div);
+    });
+  });
+}
+
+function saveApiKeys() {
+  var keys = {
+    anthropic: document.getElementById('cfg-key-anthropic').value,
+    openrouter: document.getElementById('cfg-key-openrouter').value,
+    openai: document.getElementById('cfg-key-openai').value
+  };
+  fetch('/api/settings/keys', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify(keys)
+  }).then(r=>r.json()).then(function(d) {
+    var msg = document.getElementById('apikeys-msg');
+    msg.style.display = 'block';
+    if (d.ok) {
+      msg.style.background = 'rgba(16,185,129,.15)'; msg.style.color = '#10b981';
+      msg.textContent = '✓ API keys saved';
+      loadCurrentConfig();
+    } else {
+      msg.style.background = 'rgba(244,63,94,.15)'; msg.style.color = '#f43f5e';
+      msg.textContent = d.error || 'Failed to save';
+    }
+    setTimeout(function(){ msg.style.display='none'; }, 4000);
+  });
+}
+
+function saveGeneralConfig() {
+  var config = {
+    openclawHome: document.getElementById('cfg-home').value,
+    agentName: document.getElementById('cfg-agent').value,
+    svcDashboard: document.getElementById('cfg-svc-dash').value,
+    svcTunnel: document.getElementById('cfg-svc-tunnel').value,
+    svcExtra: document.getElementById('cfg-svc-extra').value
+  };
+  fetch('/api/settings/general', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify(config)
+  }).then(r=>r.json()).then(function(d) {
+    var msg = document.getElementById('general-msg');
+    msg.style.display = 'block';
+    if (d.ok) {
+      msg.style.background = 'rgba(16,185,129,.15)'; msg.style.color = '#10b981';
+      msg.textContent = '✓ Saved — restart required for changes to take effect';
+    } else {
+      msg.style.background = 'rgba(244,63,94,.15)'; msg.style.color = '#f43f5e';
+      msg.textContent = d.error || 'Failed to save';
+    }
+    setTimeout(function(){ msg.style.display='none'; }, 5000);
+  });
+}
+
+function saveFeatures() {
+  var features = Array.from(document.querySelectorAll('input[name=feat]:checked')).map(function(cb) { return cb.value; });
+  fetch('/api/settings/features', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ features: features })
+  }).then(r=>r.json()).then(function(d) {
+    var msg = document.getElementById('features-msg');
+    msg.style.display = 'block';
+    if (d.ok) {
+      msg.style.background = 'rgba(16,185,129,.15)'; msg.style.color = '#10b981';
+      msg.textContent = '✓ Features updated' + (d.installed ? ' — installed: ' + d.installed.join(', ') : '');
+    } else {
+      msg.style.background = 'rgba(244,63,94,.15)'; msg.style.color = '#f43f5e';
+      msg.textContent = d.error || 'Failed to save';
+    }
+    setTimeout(function(){ msg.style.display='none'; }, 5000);
+  });
+}
+
+loadCurrentConfig();
 </script>
 </body>
 </html>
