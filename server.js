@@ -1356,7 +1356,7 @@ app.get('/api/orchestration/live', (req, res) => {
   const fullKeys = Object.keys(sessIndex);
 
   // Parse sessions from CLI output (not JSON - parse the table)
-  const raw = exec("openclaw sessions list 2>/dev/null", '');
+  const raw = exec("openclaw sessions 2>/dev/null", '');
   const items = [];
   
   for (const line of raw.split('\n')) {
@@ -1592,7 +1592,7 @@ app.get('/api/status/heartbeat', (req, res) => {
   if (hit) return res.json(hit);
   try {
     // Get main session status
-    const sessionsRaw = exec("openclaw sessions list 2>/dev/null", '');
+    const sessionsRaw = exec("openclaw sessions 2>/dev/null", '');
     let mainSessionStatus = { status: 'unknown', lastActivity: null, description: 'Unknown' };
     
     for (const line of sessionsRaw.split('\n')) {
@@ -2616,7 +2616,7 @@ app.get('/api/dashboard', async (req, res) => {
 
   // Gather heartbeat (use existing cache if warm)
   const heartbeatP = withCache('heartbeat', 10000, () => {
-    const sessionsRaw = exec("openclaw sessions list 2>/dev/null", '');
+    const sessionsRaw = exec("openclaw sessions 2>/dev/null", '');
     let mainSession = { status: 'unknown', description: 'Unknown', model: '' };
     for (const line of sessionsRaw.split('\n')) {
       if (line.includes('agent:main:main') || line.includes('agent:voice:main')) {
