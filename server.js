@@ -1361,7 +1361,7 @@ app.get('/api/orchestration/live', (req, res) => {
   
   for (const line of raw.split('\n')) {
     // Match lines like: direct agent:main:subag...id  5m ago  model  tokens  flags
-    const match = line.match(/^(\S+)\s+(agent:\S+)\s+(\S+\s+\S*(?:ago|now))\s+(\S+)\s+(.*)/);
+    const match = line.match(/^(\S+)\s+(agent:\S+)\s+(.+?(?:ago|now))\s+(\S+)\s+(.*)/);
     if (!match) continue;
     let [, kind, key, age, model, rest] = match;
     
@@ -1597,7 +1597,7 @@ app.get('/api/status/heartbeat', (req, res) => {
     
     for (const line of sessionsRaw.split('\n')) {
       if (line.includes('agent:main:main') || line.includes('agent:voice:main')) {
-        const match = line.match(/^(\S+)\s+(agent:main:main)\s+(\S+\s+\S*(?:ago|now))\s+(\S+)\s+(.*)/);
+        const match = line.match(/^(\S+)\s+(agent:(?:main|voice):main)\s+(.+?(?:ago|now))\s+(\S+)\s+(.*)/);
         if (match) {
           const [, , , age, model] = match;
           const ageMatch = age.trim().match(/(\d+)([mhd])\s*ago/);
