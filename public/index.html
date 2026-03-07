@@ -1442,12 +1442,12 @@
             '</div>' +
             '<svg width="100%" viewBox="0 0 ' + W + ' ' + H + '" style="display:block;overflow:visible">' +
               '<defs>' +
-                '<linearGradient id="grad_' + label.replace(/\s/g,'_') + '" x1="0" y1="0" x2="0" y2="1">' +
+                '<linearGradient id="grad_' + label.replace(/[^a-zA-Z0-9]/g,'_') + '" x1="0" y1="0" x2="0" y2="1">' +
                   '<stop offset="0%" stop-color="' + color + '" stop-opacity="0.3"/>' +
                   '<stop offset="100%" stop-color="' + color + '" stop-opacity="0.03"/>' +
                 '</linearGradient>' +
               '</defs>' +
-              '<polygon points="' + PL + ',' + (PT + iH) + ' ' + pts + ' ' + (PL + iW) + ',' + (PT + iH) + '" fill="url(#grad_' + label.replace(/\s/g,'_') + ')"/>' +
+              '<polygon points="' + PL + ',' + (PT + iH) + ' ' + pts + ' ' + (PL + iW) + ',' + (PT + iH) + '" fill="url(#grad_' + label.replace(/[^a-zA-Z0-9]/g,'_') + ')"/>' +
               '<polyline points="' + pts + '" fill="none" stroke="' + color + '" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>' +
               '<circle cx="' + dotX + '" cy="' + lastY + '" r="3" fill="' + color + '" style="filter:drop-shadow(0 0 4px ' + color + ')"/>' +
             '</svg>' +
