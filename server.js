@@ -2941,6 +2941,41 @@ app.get('/api/setup/detect', (req, res) => {
   try { execSync('which cloudflared 2>/dev/null'); results.installed.push('tunnel'); } catch {}
   try { execSync('which ollama 2>/dev/null'); results.installed.push('ollama'); } catch {}
 
+  // Detect existing API keys from OpenClaw config
+  results.keys = {};
+  if (results.openclawHome) {
+    try {
+      const configPath = path.join(results.openclawHome, 'config.json');
+      const altPath = path.join(results.openclawHome, 'openclaw.json');
+      const cfgFile = fs.existsSync(configPath) ? configPath : fs.existsSync(altPath) ? altPath : null;
+      if (cfgFile) {
+        const cfgText = fs.readFileSync(cfgFile, 'utf8');
+        const cfg = JSON.parse(cfgText);
+        // Check common key locations in OpenClaw config
+        const providers = cfg.providers || cfg.llm || {};
+        if (providers.anthropic?.apiKey || cfg.anthropicApiKey || process.env.ANTHROPIC_API_KEY) {
+          results.keys.anthropic = { detected: true, masked: '••••' + (providers.anthropic?.apiKey || cfg.anthropicApiKey || process.env.ANTHROPIC_API_KEY || '').slice(-6) };
+        }
+        if (providers.openrouter?.apiKey || cfg.openrouterApiKey || process.env.OPENROUTER_API_KEY) {
+          results.keys.openrouter = { detected: true, masked: '••••' + (providers.openrouter?.apiKey || cfg.openrouterApiKey || process.env.OPENROUTER_API_KEY || '').slice(-6) };
+        }
+        if (providers.openai?.apiKey || cfg.openaiApiKey || process.env.OPENAI_API_KEY) {
+          results.keys.openai = { detected: true, masked: '••••' + (providers.openai?.apiKey || cfg.openaiApiKey || process.env.OPENAI_API_KEY || '').slice(-6) };
+        }
+      }
+    } catch {}
+    // Fallback: check env vars directly
+    if (!results.keys.anthropic && process.env.ANTHROPIC_API_KEY) {
+      results.keys.anthropic = { detected: true, masked: '••••' + process.env.ANTHROPIC_API_KEY.slice(-6) };
+    }
+    if (!results.keys.openrouter && process.env.OPENROUTER_API_KEY) {
+      results.keys.openrouter = { detected: true, masked: '••••' + process.env.OPENROUTER_API_KEY.slice(-6) };
+    }
+    if (!results.keys.openai && process.env.OPENAI_API_KEY) {
+      results.keys.openai = { detected: true, masked: '••••' + process.env.OPENAI_API_KEY.slice(-6) };
+    }
+  }
+
   res.json(results);
 });
 

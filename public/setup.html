@@ -621,6 +621,25 @@ async function autoDetect() {
       if (data.services.extra) document.getElementById('svcExtra').value = data.services.extra;
     }
 
+    // Show detected API keys
+    if (data.keys) {
+      const keyMap = { anthropic: 'keyAnthropic', openrouter: 'keyOpenRouter', openai: 'keyOpenAI' };
+      const statusMap = { anthropic: 'statusAnthropic', openrouter: 'statusOpenRouter', openai: 'statusOpenAI' };
+      for (const [provider, info] of Object.entries(data.keys)) {
+        if (info.detected) {
+          const input = document.getElementById(keyMap[provider]);
+          const status = document.getElementById(statusMap[provider]);
+          if (input) {
+            input.placeholder = 'Detected: ' + info.masked;
+            input.dataset.detected = 'true';
+          }
+          if (status) {
+            status.innerHTML = '<span class="status status-valid">✓ detected from OpenClaw config</span>';
+          }
+        }
+      }
+    }
+
     // Pre-check features that are already installed
     if (data.installed) {
       for (const feat of data.installed) {
