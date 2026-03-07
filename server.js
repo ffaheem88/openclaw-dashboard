@@ -3,7 +3,6 @@ const { execSync, spawn } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
-const os = require('os');
 const Database = require('better-sqlite3');
 const session = require('express-session');
 const bcrypt = require('bcryptjs');
