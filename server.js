@@ -41,7 +41,7 @@ const SVC_EXTRA = (process.env.SVC_EXTRA || 'searxng,ollama').split(',').map(s =
 const SESSIONS_DIR = path.join(OPENCLAW_HOME, 'agents', AGENT_NAME, 'sessions');
 const NEURAL_DB_PATH = require('path').resolve(require('os').homedir(), '.neuralmemory/brains/default.db');
 
-const AUTH_CONFIG_PATH = path.join(WORKSPACE, 'config/dashboard-auth.json');
+const AUTH_CONFIG_PATH = path.join(__dirname, 'config', 'dashboard-auth.json');
 function getAuthConfig() {
   try { return JSON.parse(fs.readFileSync(AUTH_CONFIG_PATH, 'utf8')); }
   catch { return { username: 'admin', passwordHash: '$2a$10$placeholder' }; }
@@ -3033,10 +3033,19 @@ app.post('/api/setup/save', express.json(), (req, res) => {
     };
     fs.writeFileSync(path.join(configDir, 'dashboard-config.json'), JSON.stringify(dashConfig, null, 2));
 
-    // Write .env
-    fs.writeFileSync(path.join(__dirname, '.env'), envLines.join('\n') + '\n');
+    // Write .env to dashboard directory
+    const envPath = path.join(__dirname, '.env');
+    fs.writeFileSync(envPath, envLines.join('\n') + '\n');
 
-    res.json({ ok: true });
+    // Reload env vars in-process (no restart needed)
+    const envContent = require('dotenv').parse(fs.readFileSync(envPath));
+    for (const [key, val] of Object.entries(envContent)) {
+      process.env[key] = val;
+    }
+
+    // Auth config will be re-read on next request (getAuthConfig reads from disk)
+
+    res.json({ ok: true, restart: false });
   } catch (e) {
     res.json({ error: e.message });
   }
@@ -3148,8 +3157,10 @@ app.get('/api/setup/health', (req, res) => {
     });
   } catch { checks.push({ name: 'OpenClaw Process', status: 'error', detail: 'Check failed' }); }
 
-  // Session directory
-  const sessDir = path.join(OPENCLAW_HOME, 'agents', AGENT_NAME, 'sessions');
+  // Session directory — use env var (may have been updated by setup/save)
+  const currentHome = process.env.OPENCLAW_HOME || OPENCLAW_HOME;
+  const currentAgent = process.env.OPENCLAW_AGENT || AGENT_NAME;
+  const sessDir = path.join(currentHome, 'agents', currentAgent, 'sessions');
   checks.push({
     name: 'Session Directory',
     status: fs.existsSync(sessDir) ? 'ok' : 'error',
@@ -3157,10 +3168,11 @@ app.get('/api/setup/health', (req, res) => {
   });
 
   // Workspace
+  const currentWorkspace = process.env.OPENCLAW_WORKSPACE || WORKSPACE;
   checks.push({
     name: 'Workspace',
-    status: fs.existsSync(WORKSPACE) ? 'ok' : 'error',
-    detail: fs.existsSync(WORKSPACE) ? WORKSPACE : 'Not found'
+    status: fs.existsSync(currentWorkspace) ? 'ok' : 'error',
+    detail: fs.existsSync(currentWorkspace) ? currentWorkspace : 'Not found'
   });
 
   // Neural memory
