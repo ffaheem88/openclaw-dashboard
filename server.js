@@ -66,10 +66,14 @@ function isSetupComplete() {
 function requireAuth(req, res, next) {
   // Always allow login and setup pages
   if (req.path === '/login' || req.path === '/login.html') return next();
-  if (req.path === '/setup' || req.path === '/setup.html' || req.path.startsWith('/api/setup/')) {
+  if (req.path === '/setup' || req.path === '/setup.html') {
     if (!isSetupComplete()) return next();
-    // Setup complete — redirect setup page to login
     return res.redirect('/login');
+  }
+  // Setup APIs — allow pre-setup always, post-setup with auth
+  if (req.path.startsWith('/api/setup/')) {
+    if (!isSetupComplete()) return next();
+    // After setup, treat like normal API (fall through to auth check below)
   }
   // Setup wizard — redirect everything if setup not complete
   if (!isSetupComplete()) {
