@@ -1,0 +1,667 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OpenClaw Dashboard — Setup</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --bg: #0a0e17; --bg2: #0f1420; --glass: rgba(255,255,255,0.03);
+      --border: rgba(255,255,255,0.08); --highlight: rgba(255,255,255,0.12);
+      --text: #f1f5f9; --text2: #94a3b8; --muted: #64748b;
+      --cyan: #06b6d4; --purple: #8b5cf6; --pink: #ec4899;
+      --green: #10b981; --amber: #f59e0b; --red: #f43f5e; --blue: #3b82f6;
+      --gradient: linear-gradient(135deg, #06b6d4 0%, #8b5cf6 50%, #ec4899 100%);
+    }
+    body {
+      font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text);
+      min-height: 100vh; display: flex; align-items: center; justify-content: center;
+      padding: 20px;
+    }
+    .wizard {
+      width: 100%; max-width: 680px; background: var(--bg2);
+      border: 1px solid var(--border); border-radius: 16px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4); overflow: hidden;
+    }
+    .wizard-header {
+      padding: 32px 32px 0; text-align: center;
+    }
+    .wizard-header h1 {
+      font-size: 24px; font-weight: 700;
+      background: var(--gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    .wizard-header p { color: var(--text2); margin-top: 8px; font-size: 14px; }
+    .steps {
+      display: flex; justify-content: center; gap: 8px; padding: 24px 32px 16px;
+    }
+    .step-dot {
+      width: 10px; height: 10px; border-radius: 50%; background: var(--border);
+      transition: all 0.3s;
+    }
+    .step-dot.active { background: var(--cyan); box-shadow: 0 0 12px rgba(6,182,212,0.4); }
+    .step-dot.done { background: var(--green); }
+    .step-label {
+      font-size: 12px; color: var(--muted); text-align: center; padding-bottom: 8px;
+    }
+    .wizard-body { padding: 0 32px 32px; }
+    .step-panel { display: none; animation: fadeIn 0.3s ease; }
+    .step-panel.active { display: block; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+    .form-group { margin-bottom: 20px; }
+    .form-group label {
+      display: block; font-size: 13px; font-weight: 500; color: var(--text2);
+      margin-bottom: 6px;
+    }
+    .form-group input, .form-group select {
+      width: 100%; padding: 10px 14px; background: var(--glass); border: 1px solid var(--border);
+      border-radius: 8px; color: var(--text); font-size: 14px; font-family: inherit;
+      outline: none; transition: border-color 0.2s;
+    }
+    .form-group input:focus, .form-group select:focus { border-color: var(--cyan); }
+    .form-group input::placeholder { color: var(--muted); }
+    .form-group .hint { font-size: 11px; color: var(--muted); margin-top: 4px; }
+    .form-group .detected {
+      font-size: 12px; color: var(--green); margin-top: 4px;
+    }
+    .form-group .error-text {
+      font-size: 12px; color: var(--red); margin-top: 4px;
+    }
+    .form-row { display: flex; gap: 16px; }
+    .form-row .form-group { flex: 1; }
+
+    .feature-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .feature-card {
+      background: var(--glass); border: 1px solid var(--border); border-radius: 10px;
+      padding: 16px; cursor: pointer; transition: all 0.2s; position: relative;
+    }
+    .feature-card:hover { border-color: var(--highlight); }
+    .feature-card.selected { border-color: var(--cyan); background: rgba(6,182,212,0.05); }
+    .feature-card.always-on { border-color: var(--green); background: rgba(16,185,129,0.05); opacity: 0.8; cursor: default; }
+    .feature-card .icon { font-size: 24px; margin-bottom: 8px; }
+    .feature-card .name { font-size: 14px; font-weight: 600; }
+    .feature-card .desc { font-size: 11px; color: var(--text2); margin-top: 4px; }
+    .feature-card .badge {
+      position: absolute; top: 8px; right: 8px; font-size: 10px; padding: 2px 8px;
+      border-radius: 12px; font-weight: 600;
+    }
+    .badge-core { background: rgba(16,185,129,0.2); color: var(--green); }
+    .badge-optional { background: rgba(6,182,212,0.2); color: var(--cyan); }
+    .feature-card input[type=checkbox] { display: none; }
+
+    .api-key-section { margin-bottom: 16px; }
+    .api-key-section h3 {
+      font-size: 14px; font-weight: 600; margin-bottom: 12px; color: var(--text2);
+    }
+    .api-key-section .status {
+      display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 8px;
+      margin-left: 8px; font-weight: 600;
+    }
+    .status-valid { background: rgba(16,185,129,0.2); color: var(--green); }
+    .status-invalid { background: rgba(244,63,94,0.2); color: var(--red); }
+    .status-checking { background: rgba(245,158,11,0.2); color: var(--amber); }
+
+    .install-log {
+      background: #000; border: 1px solid var(--border); border-radius: 8px;
+      padding: 16px; font-family: 'Courier New', monospace; font-size: 12px;
+      color: var(--green); max-height: 300px; overflow-y: auto; margin-top: 16px;
+      line-height: 1.6;
+    }
+    .install-log .error { color: var(--red); }
+    .install-log .info { color: var(--cyan); }
+    .install-log .warn { color: var(--amber); }
+
+    .health-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 16px; }
+    .health-item {
+      background: var(--glass); border: 1px solid var(--border); border-radius: 8px;
+      padding: 12px; display: flex; align-items: center; gap: 10px;
+    }
+    .health-dot {
+      width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;
+    }
+    .health-dot.green { background: var(--green); box-shadow: 0 0 8px rgba(16,185,129,0.4); }
+    .health-dot.red { background: var(--red); box-shadow: 0 0 8px rgba(244,63,94,0.4); }
+    .health-dot.yellow { background: var(--amber); box-shadow: 0 0 8px rgba(245,158,11,0.4); }
+    .health-item .label { font-size: 13px; }
+    .health-item .detail { font-size: 11px; color: var(--text2); }
+
+    .btn-row { display: flex; justify-content: space-between; margin-top: 24px; }
+    .btn {
+      padding: 10px 24px; border: none; border-radius: 8px; font-size: 14px;
+      font-weight: 600; cursor: pointer; font-family: inherit; transition: all 0.2s;
+    }
+    .btn-primary {
+      background: var(--gradient); color: white;
+    }
+    .btn-primary:hover { opacity: 0.9; transform: translateY(-1px); }
+    .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+    .btn-secondary {
+      background: var(--glass); color: var(--text2); border: 1px solid var(--border);
+    }
+    .btn-secondary:hover { border-color: var(--highlight); color: var(--text); }
+    .btn-skip {
+      background: none; border: none; color: var(--muted); font-size: 13px;
+      cursor: pointer; text-decoration: underline;
+    }
+
+    .spinner {
+      display: inline-block; width: 14px; height: 14px; border: 2px solid var(--border);
+      border-top-color: var(--cyan); border-radius: 50%;
+      animation: spin 0.8s linear infinite; vertical-align: middle; margin-right: 6px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .divider { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+  </style>
+</head>
+<body>
+  <div class="wizard">
+    <div class="wizard-header">
+      <h1>🤖 OpenClaw Dashboard Setup</h1>
+      <p>Let's get your dashboard configured in a few steps</p>
+    </div>
+
+    <div class="steps">
+      <div class="step-dot active" data-step="0"></div>
+      <div class="step-dot" data-step="1"></div>
+      <div class="step-dot" data-step="2"></div>
+      <div class="step-dot" data-step="3"></div>
+    </div>
+    <div class="step-label" id="stepLabel">Step 1 — Core Configuration</div>
+
+    <div class="wizard-body">
+      <!-- STEP 1: Core Config -->
+      <div class="step-panel active" data-step="0">
+        <div class="form-group">
+          <label>OpenClaw Home Directory</label>
+          <input type="text" id="openclawHome" placeholder="Detecting...">
+          <div class="detected" id="homeDetected"></div>
+          <div class="hint">Usually ~/.openclaw — auto-detected on page load</div>
+        </div>
+
+        <div class="form-group">
+          <label>Agent Name</label>
+          <select id="agentName">
+            <option value="">Detecting...</option>
+          </select>
+          <div class="hint">Which agent's sessions to display on the dashboard</div>
+        </div>
+
+        <div class="form-group">
+          <label>Dashboard Port</label>
+          <input type="number" id="port" value="3000" min="1024" max="65535">
+        </div>
+
+        <hr class="divider">
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Admin Username</label>
+            <input type="text" id="adminUser" value="admin" autocomplete="off">
+          </div>
+          <div class="form-group">
+            <label>Admin Password</label>
+            <input type="password" id="adminPass" placeholder="Choose a password" autocomplete="new-password">
+            <div class="error-text" id="passError"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- STEP 2: Features -->
+      <div class="step-panel" data-step="1">
+        <div class="feature-grid">
+          <div class="feature-card always-on">
+            <span class="badge badge-core">CORE</span>
+            <div class="icon">📊</div>
+            <div class="name">Dashboard & Sessions</div>
+            <div class="desc">System health, session monitoring, orchestration</div>
+          </div>
+          <div class="feature-card always-on">
+            <span class="badge badge-core">CORE</span>
+            <div class="icon">💰</div>
+            <div class="name">Cost Tracking</div>
+            <div class="desc">Token usage, model costs, budget alerts</div>
+          </div>
+          <label class="feature-card" data-feature="neural">
+            <input type="checkbox" name="features" value="neural">
+            <span class="badge badge-optional">OPTIONAL</span>
+            <div class="icon">🧠</div>
+            <div class="name">Neural Memory</div>
+            <div class="desc">Memory graph visualization & recall. Installs nmem.</div>
+          </label>
+          <label class="feature-card" data-feature="mail">
+            <input type="checkbox" name="features" value="mail">
+            <span class="badge badge-optional">OPTIONAL</span>
+            <div class="icon">📧</div>
+            <div class="name">Email Inbox</div>
+            <div class="desc">Read agent emails. Requires himalaya CLI.</div>
+          </label>
+          <label class="feature-card" data-feature="github">
+            <input type="checkbox" name="features" value="github">
+            <span class="badge badge-optional">OPTIONAL</span>
+            <div class="icon">🐙</div>
+            <div class="name">GitHub Integration</div>
+            <div class="desc">Commit history, repo status. Requires gh CLI.</div>
+          </label>
+          <label class="feature-card" data-feature="vis">
+            <input type="checkbox" name="features" value="vis">
+            <span class="badge badge-optional">OPTIONAL</span>
+            <div class="icon">🗄️</div>
+            <div class="name">SQL Database</div>
+            <div class="desc">External database stats. Requires connection string.</div>
+          </label>
+          <label class="feature-card" data-feature="tunnel">
+            <input type="checkbox" name="features" value="tunnel">
+            <span class="badge badge-optional">OPTIONAL</span>
+            <div class="icon">🌐</div>
+            <div class="name">Cloudflare Tunnel</div>
+            <div class="desc">Tunnel status monitoring. Requires cloudflared.</div>
+          </label>
+          <label class="feature-card" data-feature="ollama">
+            <input type="checkbox" name="features" value="ollama">
+            <span class="badge badge-optional">OPTIONAL</span>
+            <div class="icon">🦙</div>
+            <div class="name">Local LLM (Ollama)</div>
+            <div class="desc">Local model health check. Requires ollama.</div>
+          </label>
+        </div>
+      </div>
+
+      <!-- STEP 3: API Keys & Service Config -->
+      <div class="step-panel" data-step="2">
+        <div class="api-key-section">
+          <h3>🔑 LLM Provider Keys</h3>
+          <div class="form-group">
+            <label>Anthropic API Key</label>
+            <input type="password" id="keyAnthropic" placeholder="sk-ant-...">
+            <span class="status" id="statusAnthropic"></span>
+          </div>
+          <div class="form-group">
+            <label>OpenRouter API Key <span style="color:var(--muted)">(optional)</span></label>
+            <input type="password" id="keyOpenRouter" placeholder="sk-or-...">
+            <span class="status" id="statusOpenRouter"></span>
+          </div>
+          <div class="form-group">
+            <label>OpenAI API Key <span style="color:var(--muted)">(optional)</span></label>
+            <input type="password" id="keyOpenAI" placeholder="sk-...">
+            <span class="status" id="statusOpenAI"></span>
+          </div>
+        </div>
+
+        <!-- Dynamic sections based on feature selection -->
+        <div id="visConfig" style="display:none">
+          <hr class="divider">
+          <div class="api-key-section">
+            <h3>🗄️ SQL Database Connection</h3>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Host</label>
+                <input type="text" id="visHost" placeholder="db.example.com">
+              </div>
+              <div class="form-group">
+                <label>Port</label>
+                <input type="number" id="visPort" value="1433">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Username</label>
+                <input type="text" id="visUser" placeholder="readonly_user">
+              </div>
+              <div class="form-group">
+                <label>Password</label>
+                <input type="password" id="visPass">
+              </div>
+            </div>
+            <div class="form-group">
+              <label>Database Name</label>
+              <input type="text" id="visDb" placeholder="my_database">
+            </div>
+          </div>
+        </div>
+
+        <div id="mailConfig" style="display:none">
+          <hr class="divider">
+          <div class="api-key-section">
+            <h3>📧 Email Configuration</h3>
+            <div class="form-group">
+              <label>IMAP Server</label>
+              <input type="text" id="mailImap" placeholder="imap.gmail.com">
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Email Address</label>
+                <input type="email" id="mailAddr" placeholder="agent@example.com">
+              </div>
+              <div class="form-group">
+                <label>App Password</label>
+                <input type="password" id="mailPass">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <hr class="divider">
+        <div class="api-key-section">
+          <h3>⚙️ Service Names</h3>
+          <div class="hint" style="margin-bottom: 12px">Systemd service names for status monitoring</div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Dashboard Service</label>
+              <input type="text" id="svcDashboard" placeholder="Detecting...">
+            </div>
+            <div class="form-group">
+              <label>Tunnel Service</label>
+              <input type="text" id="svcTunnel" placeholder="Detecting...">
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Extra Services <span style="color:var(--muted)">(comma-separated)</span></label>
+            <input type="text" id="svcExtra" placeholder="searxng,ollama">
+          </div>
+        </div>
+      </div>
+
+      <!-- STEP 4: Install & Health Check -->
+      <div class="step-panel" data-step="3">
+        <div id="preInstall">
+          <h3 style="font-size: 16px; margin-bottom: 12px;">📋 Setup Summary</h3>
+          <div id="summaryList" style="font-size: 13px; color: var(--text2); line-height: 2;"></div>
+          <div style="margin-top: 16px; text-align: center;">
+            <button class="btn btn-primary" id="btnInstall" onclick="runInstall()">
+              🚀 Apply Configuration & Install
+            </button>
+          </div>
+        </div>
+
+        <div id="installProgress" style="display:none">
+          <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+            <span class="spinner" id="installSpinner"></span>
+            <span id="installStatus" style="font-size: 14px; font-weight: 500;">Installing...</span>
+          </div>
+          <div class="install-log" id="installLog"></div>
+        </div>
+
+        <div id="postInstall" style="display:none">
+          <h3 style="font-size: 16px; margin-bottom: 4px;">✅ Setup Complete!</h3>
+          <p style="font-size: 13px; color: var(--text2); margin-bottom: 12px;">Health check results:</p>
+          <div class="health-grid" id="healthGrid"></div>
+          <div style="margin-top: 24px; text-align: center;">
+            <button class="btn btn-primary" onclick="window.location='/login'">
+              🔐 Go to Login
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Navigation buttons -->
+      <div class="btn-row" id="navRow">
+        <button class="btn btn-secondary" id="btnBack" onclick="prevStep()" style="visibility:hidden">← Back</button>
+        <button class="btn btn-primary" id="btnNext" onclick="nextStep()">Next →</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+let currentStep = 0;
+const totalSteps = 4;
+const stepLabels = [
+  'Step 1 — Core Configuration',
+  'Step 2 — Choose Features',
+  'Step 3 — API Keys & Services',
+  'Step 4 — Install & Verify'
+];
+
+// Feature toggle
+document.querySelectorAll('.feature-card[data-feature]').forEach(card => {
+  card.addEventListener('click', () => {
+    const cb = card.querySelector('input[type=checkbox]');
+    cb.checked = !cb.checked;
+    card.classList.toggle('selected', cb.checked);
+    updateConditionalSections();
+  });
+});
+
+function updateConditionalSections() {
+  const selected = getSelectedFeatures();
+  document.getElementById('visConfig').style.display = selected.includes('vis') ? 'block' : 'none';
+  document.getElementById('mailConfig').style.display = selected.includes('mail') ? 'block' : 'none';
+}
+
+function getSelectedFeatures() {
+  return Array.from(document.querySelectorAll('input[name=features]:checked')).map(cb => cb.value);
+}
+
+function updateSteps() {
+  document.querySelectorAll('.step-dot').forEach((dot, i) => {
+    dot.classList.toggle('active', i === currentStep);
+    dot.classList.toggle('done', i < currentStep);
+  });
+  document.querySelectorAll('.step-panel').forEach((panel, i) => {
+    panel.classList.toggle('active', i === currentStep);
+  });
+  document.getElementById('stepLabel').textContent = stepLabels[currentStep];
+  document.getElementById('btnBack').style.visibility = currentStep === 0 ? 'hidden' : 'visible';
+
+  if (currentStep === totalSteps - 1) {
+    document.getElementById('navRow').style.display = 'none';
+    buildSummary();
+  } else {
+    document.getElementById('navRow').style.display = 'flex';
+    document.getElementById('btnNext').textContent = 'Next →';
+  }
+}
+
+function nextStep() {
+  if (currentStep === 0) {
+    const pass = document.getElementById('adminPass').value;
+    if (!pass || pass.length < 4) {
+      document.getElementById('passError').textContent = 'Password must be at least 4 characters';
+      return;
+    }
+    document.getElementById('passError').textContent = '';
+  }
+  if (currentStep < totalSteps - 1) {
+    currentStep++;
+    updateSteps();
+  }
+}
+
+function prevStep() {
+  if (currentStep > 0) { currentStep--; updateSteps(); }
+}
+
+function buildSummary() {
+  const features = getSelectedFeatures();
+  const lines = [
+    `<b>OpenClaw Home:</b> ${document.getElementById('openclawHome').value}`,
+    `<b>Agent:</b> ${document.getElementById('agentName').value}`,
+    `<b>Port:</b> ${document.getElementById('port').value}`,
+    `<b>Admin:</b> ${document.getElementById('adminUser').value}`,
+    `<b>Features:</b> Dashboard, Cost Tracking${features.length ? ', ' + features.join(', ') : ''}`,
+  ];
+  if (document.getElementById('keyAnthropic').value) lines.push('<b>Anthropic:</b> ✅ configured');
+  if (document.getElementById('keyOpenRouter').value) lines.push('<b>OpenRouter:</b> ✅ configured');
+  if (document.getElementById('keyOpenAI').value) lines.push('<b>OpenAI:</b> ✅ configured');
+  document.getElementById('summaryList').innerHTML = lines.join('<br>');
+}
+
+function getConfig() {
+  return {
+    openclawHome: document.getElementById('openclawHome').value,
+    agentName: document.getElementById('agentName').value,
+    port: document.getElementById('port').value,
+    adminUser: document.getElementById('adminUser').value,
+    adminPass: document.getElementById('adminPass').value,
+    features: getSelectedFeatures(),
+    keys: {
+      anthropic: document.getElementById('keyAnthropic').value,
+      openrouter: document.getElementById('keyOpenRouter').value,
+      openai: document.getElementById('keyOpenAI').value,
+    },
+    vis: {
+      host: document.getElementById('visHost').value,
+      port: document.getElementById('visPort').value,
+      user: document.getElementById('visUser').value,
+      pass: document.getElementById('visPass').value,
+      db: document.getElementById('visDb').value,
+    },
+    mail: {
+      imap: document.getElementById('mailImap').value,
+      addr: document.getElementById('mailAddr').value,
+      pass: document.getElementById('mailPass').value,
+    },
+    services: {
+      dashboard: document.getElementById('svcDashboard').value,
+      tunnel: document.getElementById('svcTunnel').value,
+      extra: document.getElementById('svcExtra').value,
+    }
+  };
+}
+
+async function runInstall() {
+  document.getElementById('preInstall').style.display = 'none';
+  document.getElementById('installProgress').style.display = 'block';
+  const log = document.getElementById('installLog');
+
+  function addLog(msg, cls = '') {
+    const div = document.createElement('div');
+    div.className = cls;
+    div.textContent = msg;
+    log.appendChild(div);
+    log.scrollTop = log.scrollHeight;
+  }
+
+  const config = getConfig();
+  addLog('▸ Saving configuration...', 'info');
+
+  try {
+    const saveRes = await fetch('/api/setup/save', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(config)
+    });
+    const saveData = await saveRes.json();
+    if (saveData.error) { addLog('✗ ' + saveData.error, 'error'); return; }
+    addLog('✓ Configuration saved', '');
+
+    // Install features
+    if (config.features.length) {
+      addLog('▸ Installing features: ' + config.features.join(', '), 'info');
+      const installRes = await fetch('/api/setup/install', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ features: config.features, openclawHome: config.openclawHome })
+      });
+      const installData = await installRes.json();
+      for (const step of (installData.steps || [])) {
+        addLog((step.ok ? '✓ ' : '✗ ') + step.message, step.ok ? '' : 'error');
+      }
+    }
+
+    addLog('▸ Running health check...', 'info');
+    const healthRes = await fetch('/api/setup/health');
+    const healthData = await healthRes.json();
+
+    document.getElementById('installSpinner').style.display = 'none';
+    document.getElementById('installStatus').textContent = 'Complete!';
+
+    // Show health results
+    const grid = document.getElementById('healthGrid');
+    for (const check of (healthData.checks || [])) {
+      const color = check.status === 'ok' ? 'green' : check.status === 'warn' ? 'yellow' : 'red';
+      grid.innerHTML += `
+        <div class="health-item">
+          <div class="health-dot ${color}"></div>
+          <div>
+            <div class="label">${check.name}</div>
+            <div class="detail">${check.detail || ''}</div>
+          </div>
+        </div>`;
+    }
+
+    setTimeout(() => {
+      document.getElementById('installProgress').style.display = 'none';
+      document.getElementById('postInstall').style.display = 'block';
+    }, 1000);
+
+  } catch (e) {
+    addLog('✗ ' + e.message, 'error');
+  }
+}
+
+// Auto-detect on load
+async function autoDetect() {
+  try {
+    const res = await fetch('/api/setup/detect');
+    const data = await res.json();
+
+    if (data.openclawHome) {
+      document.getElementById('openclawHome').value = data.openclawHome;
+      document.getElementById('homeDetected').textContent = '✓ Auto-detected';
+    }
+
+    const agentSelect = document.getElementById('agentName');
+    agentSelect.innerHTML = '';
+    if (data.agents && data.agents.length) {
+      for (const a of data.agents) {
+        const opt = document.createElement('option');
+        opt.value = a; opt.textContent = a;
+        agentSelect.appendChild(opt);
+      }
+    } else {
+      agentSelect.innerHTML = '<option value="voice">voice (default)</option>';
+    }
+
+    if (data.services) {
+      if (data.services.dashboard) document.getElementById('svcDashboard').value = data.services.dashboard;
+      if (data.services.tunnel) document.getElementById('svcTunnel').value = data.services.tunnel;
+      if (data.services.extra) document.getElementById('svcExtra').value = data.services.extra;
+    }
+
+    // Pre-check features that are already installed
+    if (data.installed) {
+      for (const feat of data.installed) {
+        const card = document.querySelector(`.feature-card[data-feature="${feat}"]`);
+        if (card) {
+          const cb = card.querySelector('input[type=checkbox]');
+          cb.checked = true;
+          card.classList.add('selected');
+        }
+      }
+    }
+  } catch (e) {
+    console.error('Auto-detect failed:', e);
+  }
+}
+
+// Validate API keys on blur
+async function validateKey(provider, inputId, statusId) {
+  const input = document.getElementById(inputId);
+  const status = document.getElementById(statusId);
+  input.addEventListener('blur', async () => {
+    const key = input.value.trim();
+    if (!key) { status.textContent = ''; return; }
+    status.innerHTML = '<span class="status status-checking">checking...</span>';
+    try {
+      const res = await fetch('/api/setup/validate', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ provider, key })
+      });
+      const data = await res.json();
+      status.innerHTML = data.valid
+        ? '<span class="status status-valid">✓ valid</span>'
+        : '<span class="status status-invalid">✗ invalid</span>';
+    } catch { status.innerHTML = '<span class="status status-invalid">✗ error</span>'; }
+  });
+}
+
+validateKey('anthropic', 'keyAnthropic', 'statusAnthropic');
+validateKey('openrouter', 'keyOpenRouter', 'statusOpenRouter');
+validateKey('openai', 'keyOpenAI', 'statusOpenAI');
+
+autoDetect();
+</script>
+</body>
+</html>
