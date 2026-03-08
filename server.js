@@ -3952,23 +3952,46 @@ app.post('/api/agent/steer', express.json(), requireAuth, (req, res) => {
   res.json({ ok: true });
 });
 
-// POST /api/chat/session — send message to an existing session
+// POST /api/chat/session — send message to a session via gateway tool-call API
 app.post('/api/chat/session', requireAuth, async (req, res) => {
   const { key, message } = req.body || {};
   if (!key || !message) return res.status(400).json({ error: 'key and message required' });
   try {
-    const result = runCommand('openclaw', ['sessions', 'send', '--key', key, '--message', message], { timeout: 60000 });
-    if (result.ok) {
-      res.json({ ok: true, response: result.stdout || '(sent)' });
+    // Read gateway token from openclaw config
+    const ocConfigPath = path.join(getOpenClawHome(), 'openclaw.json');
+    let gwToken = '';
+    let gwPort = 18789;
+    try {
+      const ocConfig = JSON.parse(fs.readFileSync(ocConfigPath, 'utf8'));
+      gwToken = ocConfig?.gateway?.auth?.token || '';
+      gwPort = ocConfig?.gateway?.port || 18789;
+    } catch {}
+
+    if (!gwToken) {
+      return res.json({ error: 'Gateway token not found in openclaw.json — cannot send to sessions' });
+    }
+
+    // Use gateway tool-call API
+    const gwUrl = `http://127.0.0.1:${gwPort}/v1/tools/sessions_send`;
+    const response = await fetch(gwUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${gwToken}` },
+      body: JSON.stringify({ sessionKey: key, message }),
+      signal: AbortSignal.timeout(60000)
+    });
+
+    if (response.ok) {
+      const data = await response.json().catch(() => ({}));
+      res.json({ ok: true, response: data.response || data.result || '(message sent to session)' });
     } else {
-      // Fallback: try writing to steer file
-      const steerDir = CONFIG_DIR;
-      const steerFile = path.join(steerDir, 'steer-requests.json');
+      const errText = await response.text().catch(() => 'Unknown error');
+      // Fallback: steer file
+      const steerFile = path.join(CONFIG_DIR, 'steer-requests.json');
       let requests = [];
       try { requests = JSON.parse(fs.readFileSync(steerFile, 'utf8')); } catch {}
       requests.push({ key, message, timestamp: new Date().toISOString() });
       fs.writeFileSync(steerFile, JSON.stringify(requests, null, 2));
-      res.json({ ok: true, response: '(message queued — session may not support direct send)', fallback: true });
+      res.json({ ok: true, response: '(message queued for next agent pickup — gateway returned: ' + response.status + ')', fallback: true });
     }
   } catch (e) {
     res.status(500).json({ error: e.message });
