@@ -3349,6 +3349,30 @@ app.get('/setup', (req, res) => {
   res.sendFile('setup.html', { root: path.join(__dirname, 'public') });
 });
 
+// POST /api/workspace/file — save file content
+app.post('/api/workspace/file', express.json({ limit: '1mb' }), requireAuth, (req, res) => {
+  const { path: relPath, content } = req.body || {};
+  if (!relPath || relPath.startsWith('/') || relPath.includes('..')) {
+    return res.status(400).json({ error: 'Invalid path' });
+  }
+  const allowed = ['.md', '.txt', '.json', '.yml', '.yaml', '.toml', '.sh', '.js', '.py'];
+  const ext = path.extname(relPath).toLowerCase();
+  if (!allowed.includes(ext)) {
+    return res.status(403).json({ error: 'File type not editable' });
+  }
+  const abs = path.join(WORKSPACE, relPath);
+  try {
+    const dir = path.dirname(abs);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(abs, content, 'utf8');
+    const stat = fs.statSync(abs);
+    cache.clear(); // Invalidate workspace cache
+    res.json({ ok: true, path: relPath, size: stat.size, mtime: stat.mtime.toISOString() });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // ── Virtual host routing ──────────────────────────────────────────────────
 // (ARC website routing is above requireAuth — see line ~90)
 

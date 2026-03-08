@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Workspace Files — OpenClaw Dashboard</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+    :root{
+      --bg:#0a0e17;--bg2:#0f1420;--glass:rgba(255,255,255,.03);
+      --border:rgba(255,255,255,.08);--highlight:rgba(255,255,255,.12);
+      --text:#f1f5f9;--text2:#94a3b8;--muted:#64748b;
+      --cyan:#06b6d4;--purple:#8b5cf6;--green:#10b981;--amber:#f59e0b;--red:#f43f5e;
+      --gradient:linear-gradient(135deg,#06b6d4 0%,#8b5cf6 50%,#ec4899 100%);
+    }
+    body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);font-size:14px;min-height:100vh;display:flex;flex-direction:column}
+    .topbar{background:var(--bg2);border-bottom:1px solid var(--border);padding:12px 24px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
+    .topbar h1{font-size:18px;font-weight:700;background:var(--gradient);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+    .topbar .nav{display:flex;gap:12px;align-items:center}
+    .topbar .nav a{color:var(--text2);text-decoration:none;font-size:13px;padding:6px 12px;border-radius:6px;transition:all .2s}
+    .topbar .nav a:hover{background:var(--glass);color:var(--text)}
+    .container{display:flex;flex:1;overflow:hidden}
+    .sidebar{width:280px;background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
+    .sidebar-header{padding:14px 16px;border-bottom:1px solid var(--border);display:flex;gap:8px}
+    .sidebar-header input{flex:1;padding:8px 12px;background:var(--glass);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px;font-family:inherit;outline:none}
+    .sidebar-header input:focus{border-color:var(--cyan)}
+    .file-tree{flex:1;overflow-y:auto;padding:8px}
+    .file-item{display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:6px;cursor:pointer;font-size:13px;transition:all .15s;color:var(--text2)}
+    .file-item:hover{background:var(--glass);color:var(--text)}
+    .file-item.active{background:rgba(6,182,212,.1);color:var(--cyan);border:1px solid rgba(6,182,212,.2)}
+    .file-item .icon{font-size:16px;width:20px;text-align:center;flex-shrink:0}
+    .file-item .name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .file-item .meta{font-size:11px;color:var(--muted);flex-shrink:0}
+    .dir-item{font-weight:600;color:var(--text)}
+    .dir-item .icon{color:var(--amber)}
+    .dir-children{padding-left:16px;display:none}
+    .dir-children.open{display:block}
+    .editor-area{flex:1;display:flex;flex-direction:column;overflow:hidden}
+    .editor-toolbar{padding:10px 20px;background:var(--bg2);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:12px}
+    .editor-toolbar .filepath{font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--cyan);flex:1}
+    .editor-toolbar .file-meta{font-size:12px;color:var(--muted)}
+    .editor-toolbar .actions{display:flex;gap:8px}
+    .btn{padding:7px 16px;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .2s}
+    .btn-save{background:var(--green);color:#fff}
+    .btn-save:hover{opacity:.9}
+    .btn-save:disabled{opacity:.4;cursor:default}
+    .btn-secondary{background:var(--glass);color:var(--text2);border:1px solid var(--border)}
+    .btn-secondary:hover{color:var(--text);border-color:var(--highlight)}
+    .editor-content{flex:1;display:flex;overflow:hidden}
+    .code-editor{flex:1;overflow:auto;padding:0}
+    .code-editor textarea{width:100%;height:100%;padding:20px;background:transparent;border:none;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:13px;line-height:1.7;resize:none;outline:none;tab-size:2}
+    .preview-pane{flex:1;overflow-y:auto;padding:20px 24px;border-left:1px solid var(--border);display:none;line-height:1.7}
+    .preview-pane h1,.preview-pane h2,.preview-pane h3{margin:16px 0 8px;color:var(--text)}
+    .preview-pane h1{font-size:22px;border-bottom:1px solid var(--border);padding-bottom:8px}
+    .preview-pane h2{font-size:18px}
+    .preview-pane h3{font-size:15px}
+    .preview-pane p{margin:8px 0;color:var(--text2)}
+    .preview-pane code{background:rgba(139,92,246,.15);padding:2px 6px;border-radius:4px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--purple)}
+    .preview-pane pre{background:rgba(0,0,0,.3);border:1px solid var(--border);border-radius:8px;padding:14px;overflow-x:auto;margin:12px 0}
+    .preview-pane pre code{background:none;padding:0;color:var(--green)}
+    .preview-pane ul,.preview-pane ol{padding-left:24px;margin:8px 0}
+    .preview-pane li{margin:4px 0;color:var(--text2)}
+    .preview-pane strong{color:var(--text)}
+    .preview-pane em{color:var(--text2);font-style:italic}
+    .preview-pane blockquote{border-left:3px solid var(--cyan);padding-left:14px;margin:12px 0;color:var(--muted)}
+    .preview-pane a{color:var(--cyan)}
+    .preview-pane hr{border:none;border-top:1px solid var(--border);margin:16px 0}
+    .empty-state{flex:1;display:flex;align-items:center;justify-content:center;flex-direction:column;color:var(--muted);gap:12px}
+    .empty-state .icon{font-size:48px;opacity:.3}
+    .toast{position:fixed;bottom:24px;right:24px;padding:12px 20px;border-radius:8px;font-size:13px;font-weight:500;z-index:999;animation:slideUp .3s ease;display:none}
+    .toast.success{background:rgba(16,185,129,.9);color:#fff;display:block}
+    .toast.error{background:rgba(244,63,94,.9);color:#fff;display:block}
+    @keyframes slideUp{from{transform:translateY(20px);opacity:0}to{transform:none;opacity:1}}
+    .search-results{padding:8px}
+    .search-result{padding:8px 12px;border-radius:6px;cursor:pointer;font-size:12px;border-bottom:1px solid var(--border)}
+    .search-result:hover{background:var(--glass)}
+    .search-result .sr-path{color:var(--cyan);font-family:'JetBrains Mono',monospace}
+    .search-result .sr-line{color:var(--text2);margin-top:2px}
+    .search-result .sr-match{color:var(--amber);font-weight:600}
+    .modified{color:var(--amber) !important}
+    .modified::after{content:" •";color:var(--amber)}
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <h1>🗂️ Workspace Files</h1>
+    <div class="nav">
+      <a href="/">← Dashboard</a>
+      <a href="/agents.html">Agents</a>
+      <a href="/neural.html">Neural</a>
+      <a href="/settings.html">Settings</a>
+      <a href="/logout" style="color:var(--red)">Logout</a>
+    </div>
+  </div>
+
+  <div class="container">
+    <div class="sidebar">
+      <div class="sidebar-header">
+        <input type="text" id="searchInput" placeholder="🔍 Search files..." oninput="debounceSearch()">
+      </div>
+      <div class="file-tree" id="fileTree">
+        <div style="padding:20px;color:var(--muted);text-align:center">Loading...</div>
+      </div>
+    </div>
+
+    <div class="editor-area">
+      <div class="editor-toolbar" id="toolbar" style="display:none">
+        <div class="filepath" id="filePath"></div>
+        <div class="file-meta" id="fileMeta"></div>
+        <div class="actions">
+          <button class="btn btn-secondary" id="btnPreview" onclick="togglePreview()">👁️ Preview</button>
+          <button class="btn btn-save" id="btnSave" onclick="saveFile()" disabled>💾 Save</button>
+        </div>
+      </div>
+      <div class="editor-content">
+        <div class="code-editor" id="editorPane" style="display:none">
+          <textarea id="editor" spellcheck="false" oninput="markModified()"></textarea>
+        </div>
+        <div class="preview-pane" id="previewPane"></div>
+        <div class="empty-state" id="emptyState">
+          <div class="icon">📄</div>
+          <div>Select a file to view or edit</div>
+          <div style="font-size:12px">Supports .md, .txt, .json, .yml, .sh, .js, .py</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+<script>
+var currentFile = null;
+var originalContent = '';
+var isPreviewMode = false;
+var searchTimeout = null;
+
+function toast(msg, type) {
+  var t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast ' + type;
+  setTimeout(function() { t.className = 'toast'; }, 3000);
+}
+
+function formatSize(bytes) {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024*1024) return (bytes/1024).toFixed(1) + ' KB';
+  return (bytes/(1024*1024)).toFixed(1) + ' MB';
+}
+
+function formatAge(mtime) {
+  var ms = Date.now() - new Date(mtime).getTime();
+  var m = Math.floor(ms/60000);
+  if (m < 1) return 'just now';
+  if (m < 60) return m + 'm ago';
+  var h = Math.floor(m/60);
+  if (h < 24) return h + 'h ago';
+  return Math.floor(h/24) + 'd ago';
+}
+
+function getIcon(name, isDir) {
+  if (isDir) return '📁';
+  var ext = name.split('.').pop().toLowerCase();
+  var icons = {md:'📝',txt:'📄',json:'⚙️',yml:'⚙️',yaml:'⚙️',sh:'🔧',js:'🟨',py:'🐍',toml:'⚙️'};
+  return icons[ext] || '📄';
+}
+
+// Load file tree
+function loadTree() {
+  fetch('/api/workspace/files').then(function(r){return r.json()}).then(function(data) {
+    var tree = document.getElementById('fileTree');
+    if (!data.files || !data.files.length) {
+      tree.innerHTML = '<div style="padding:20px;color:var(--muted);text-align:center">No files found</div>';
+      return;
+    }
+    // Build tree structure
+    var dirs = {};
+    var rootFiles = [];
+    data.files.forEach(function(f) {
+      var parts = f.path.split('/');
+      if (parts.length === 1) {
+        rootFiles.push(f);
+      } else {
+        var dir = parts[0];
+        if (!dirs[dir]) dirs[dir] = [];
+        dirs[dir].push(f);
+      }
+    });
+
+    var html = '';
+    // Root files first
+    rootFiles.sort(function(a,b){return a.name.localeCompare(b.name)});
+    rootFiles.forEach(function(f) {
+      html += '<div class="file-item" onclick="openFile(\'' + f.path + '\')" data-path="' + f.path + '">' +
+        '<span class="icon">' + getIcon(f.name) + '</span>' +
+        '<span class="name">' + f.name + '</span>' +
+        '<span class="meta">' + formatSize(f.size) + '</span></div>';
+    });
+
+    // Directories
+    Object.keys(dirs).sort().forEach(function(dir) {
+      html += '<div class="file-item dir-item" onclick="toggleDir(this)">' +
+        '<span class="icon">📁</span><span class="name">' + dir + '/</span>' +
+        '<span class="meta">' + dirs[dir].length + ' files</span></div>';
+      html += '<div class="dir-children">';
+      dirs[dir].sort(function(a,b){return a.name.localeCompare(b.name)}).forEach(function(f) {
+        html += '<div class="file-item" onclick="openFile(\'' + f.path + '\')" data-path="' + f.path + '">' +
+          '<span class="icon">' + getIcon(f.name) + '</span>' +
+          '<span class="name">' + f.name + '</span>' +
+          '<span class="meta">' + formatSize(f.size) + '</span></div>';
+      });
+      html += '</div>';
+    });
+
+    tree.innerHTML = html;
+  });
+}
+
+function toggleDir(el) {
+  var children = el.nextElementSibling;
+  if (children && children.classList.contains('dir-children')) {
+    children.classList.toggle('open');
+    el.querySelector('.icon').textContent = children.classList.contains('open') ? '📂' : '📁';
+  }
+}
+
+function openFile(filePath) {
+  if (currentFile && document.getElementById('editor').value !== originalContent) {
+    if (!confirm('Unsaved changes. Discard?')) return;
+  }
+  fetch('/api/workspace/file?path=' + encodeURIComponent(filePath)).then(function(r){return r.json()}).then(function(data) {
+    if (data.error) { toast(data.error, 'error'); return; }
+    currentFile = filePath;
+    originalContent = data.content;
+    document.getElementById('editor').value = data.content;
+    document.getElementById('filePath').textContent = filePath;
+    document.getElementById('fileMeta').textContent = formatSize(data.size) + ' · ' + formatAge(data.mtime);
+    document.getElementById('toolbar').style.display = 'flex';
+    document.getElementById('editorPane').style.display = 'block';
+    document.getElementById('emptyState').style.display = 'none';
+    document.getElementById('btnSave').disabled = true;
+
+    // Highlight active file
+    document.querySelectorAll('.file-item').forEach(function(el) {
+      el.classList.toggle('active', el.dataset.path === filePath);
+    });
+
+    // Update preview if in preview mode
+    if (isPreviewMode) renderPreview();
+  });
+}
+
+function markModified() {
+  var modified = document.getElementById('editor').value !== originalContent;
+  document.getElementById('btnSave').disabled = !modified;
+  var pathEl = document.getElementById('filePath');
+  pathEl.classList.toggle('modified', modified);
+}
+
+function saveFile() {
+  if (!currentFile) return;
+  var content = document.getElementById('editor').value;
+  fetch('/api/workspace/file', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({path: currentFile, content: content})
+  }).then(function(r){return r.json()}).then(function(data) {
+    if (data.ok) {
+      originalContent = content;
+      markModified();
+      document.getElementById('fileMeta').textContent = formatSize(data.size) + ' · just now';
+      toast('Saved ' + currentFile, 'success');
+    } else {
+      toast(data.error || 'Save failed', 'error');
+    }
+  }).catch(function() { toast('Network error', 'error'); });
+}
+
+function togglePreview() {
+  isPreviewMode = !isPreviewMode;
+  var btn = document.getElementById('btnPreview');
+  var editor = document.getElementById('editorPane');
+  var preview = document.getElementById('previewPane');
+
+  if (isPreviewMode) {
+    btn.textContent = '✏️ Edit';
+    preview.style.display = 'block';
+    if (currentFile && currentFile.endsWith('.md')) {
+      editor.style.display = 'block'; // side by side for md
+    } else {
+      editor.style.display = 'none';
+    }
+    renderPreview();
+  } else {
+    btn.textContent = '👁️ Preview';
+    preview.style.display = 'none';
+    editor.style.display = 'block';
+  }
+}
+
+function renderPreview() {
+  var content = document.getElementById('editor').value;
+  var html = content
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+    .replace(/^## (.+)$/gm, '<h2>$1</h2>')
+    .replace(/^# (.+)$/gm, '<h1>$1</h1>')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g, '<em>$1</em>')
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/^- (.+)$/gm, '<li>$1</li>')
+    .replace(/^---$/gm, '<hr>')
+    .replace(/^\> (.+)$/gm, '<blockquote>$1</blockquote>')
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>')
+    .replace(/\n\n/g, '</p><p>')
+    .replace(/\n/g, '<br>');
+  document.getElementById('previewPane').innerHTML = '<p>' + html + '</p>';
+}
+
+// Search
+function debounceSearch() {
+  clearTimeout(searchTimeout);
+  var q = document.getElementById('searchInput').value.trim();
+  if (q.length < 2) { loadTree(); return; }
+  searchTimeout = setTimeout(function() { searchFiles(q); }, 300);
+}
+
+function searchFiles(query) {
+  fetch('/api/workspace/search?q=' + encodeURIComponent(query)).then(function(r){return r.json()}).then(function(data) {
+    var tree = document.getElementById('fileTree');
+    if (!data.results || !data.results.length) {
+      tree.innerHTML = '<div style="padding:20px;color:var(--muted);text-align:center">No results for "' + query + '"</div>';
+      return;
+    }
+    var html = '<div class="search-results">';
+    data.results.forEach(function(r) {
+      html += '<div class="search-result" onclick="openFile(\'' + r.file + '\')">' +
+        '<div class="sr-path">' + r.file + ':' + r.line + '</div>' +
+        '<div class="sr-line">' + (r.text || '').substring(0, 120) + '</div></div>';
+    });
+    html += '</div>';
+    tree.innerHTML = html;
+  });
+}
+
+// Keyboard shortcuts
+document.addEventListener('keydown', function(e) {
+  if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+    e.preventDefault();
+    if (!document.getElementById('btnSave').disabled) saveFile();
+  }
+});
+
+loadTree();
+</script>
+</body>
+</html>
