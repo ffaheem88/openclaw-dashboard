@@ -3900,20 +3900,22 @@ app.get('/api/live/sessions', requireAuth, (req, res) => {
 
     const sessions = Object.entries(data).map(([key, val]) => {
       const origin = val.origin || {};
-      // Resolve friendly name
-      let friendlyName = null;
-      if (key.includes(':direct:')) {
-        const phone = key.split(':direct:')[1];
-        friendlyName = phone;
-      } else if (key.includes(':group:')) {
-        const groupId = key.split(':group:')[1];
-        friendlyName = groupNames[groupId] || null;
-      } else if (key.endsWith(':main')) {
-        friendlyName = 'Main Session';
-      } else if (key.includes(':cron:')) {
-        friendlyName = 'Cron: ' + key.split(':cron:')[1].substring(0, 8);
-      } else if (key.includes(':subagent:')) {
-        friendlyName = 'Sub-agent: ' + key.split(':subagent:')[1].substring(0, 12);
+      // Resolve friendly name from session metadata
+      let friendlyName = val.subject || val.displayName || null;
+      if (!friendlyName) {
+        if (key.includes(':direct:')) {
+          friendlyName = key.split(':direct:')[1];
+        } else if (key.includes(':group:')) {
+          const groupId = key.split(':group:')[1];
+          friendlyName = groupNames[groupId] || null;
+        } else if (key.endsWith(':main')) {
+          friendlyName = 'Main Session';
+        } else if (key.includes(':cron:')) {
+          const cronId = key.split(':cron:')[1];
+          friendlyName = 'Cron: ' + cronId.substring(0, 8);
+        } else if (key.includes(':subagent:')) {
+          friendlyName = 'Sub-agent: ' + key.split(':subagent:')[1].substring(0, 12);
+        }
       }
       return {
         key,
@@ -4003,12 +4005,12 @@ app.post('/api/chat/session', requireAuth, async (req, res) => {
       return res.json({ error: 'Gateway token not found in openclaw.json — cannot send to sessions' });
     }
 
-    // Use gateway tool-call API
-    const gwUrl = `http://127.0.0.1:${gwPort}/v1/tools/sessions_send`;
+    // Use gateway /tools/invoke API (POST /tools/invoke)
+    const gwUrl = `http://127.0.0.1:${gwPort}/tools/invoke`;
     const response = await fetch(gwUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${gwToken}` },
-      body: JSON.stringify({ sessionKey: key, message }),
+      body: JSON.stringify({ tool: 'sessions_send', args: { sessionKey: key, message } }),
       signal: AbortSignal.timeout(60000)
     });
 
