@@ -170,13 +170,16 @@ function loadTargets(){
     var html='<div class="separator">Active Sessions</div>';
     
     sessions.forEach(function(s){
-      var age=s.updatedAt?Math.floor((Date.now()-new Date(s.updatedAt).getTime())/60000):999;
+      var age=s.updatedAtMs?Math.floor((Date.now()-s.updatedAtMs)/60000):(s.updatedAt?Math.floor((Date.now()-new Date(s.updatedAt).getTime())/60000):99999);
       var dotCls=age<2?'dot-active':age<10?'dot-idle':'dot-off';
-      var label=s.key.replace(/^agent:(voice|main):/,'');
-      var icon=s.key.includes('whatsapp')?'📱':s.key.includes('cron')?'⏰':s.key.includes('subagent')?'🤖':'💬';
+      var label=s.friendlyName||s.label||s.key.replace(/^agent:(voice|main):/,'');
+      var surface=s.surface||'';
+      var icon=surface==='whatsapp'?'📱':surface==='telegram'?'✈️':surface==='discord'?'🎮':s.key.includes('cron')?'⏰':s.key.includes('subagent')?'🤖':s.key.endsWith(':main')?'🏠':'💬';
+      var ageText=age<1?'just now':age<60?age+'m ago':age<1440?Math.floor(age/60)+'h ago':Math.floor(age/1440)+'d ago';
+      var modelTag=s.model?'<div class="detail" style="font-size:10px;color:var(--purple)">'+escapeHtml(s.model)+'</div>':'';
       html+='<div class="target-item" data-type="session" data-key="'+escapeHtml(s.key)+'" onclick="selectTarget(this)">';
       html+='<span class="icon">'+icon+'</span><div class="info"><div class="name">'+escapeHtml(label)+'</div>';
-      html+='<div class="detail">'+(age<60?age+'m ago':age<1440?Math.floor(age/60)+'h ago':Math.floor(age/1440)+'d ago')+'</div></div>';
+      html+='<div class="detail">'+ageText+(s.chatType&&s.chatType!=='unknown'?' · '+s.chatType:'')+'</div>'+modelTag+'</div>';
       html+='<span class="status-dot '+dotCls+'"></span></div>';
     });
 

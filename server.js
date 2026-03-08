@@ -3888,14 +3888,46 @@ app.get('/api/live/sessions', requireAuth, (req, res) => {
   try {
     const sjPath = path.join(getSessionsDir(), 'sessions.json');
     const data = JSON.parse(fs.readFileSync(sjPath, 'utf8'));
-    const sessions = Object.entries(data).map(([key, val]) => ({
-      key,
-      sessionId: val.sessionId,
-      updatedAt: val.updatedAt ? new Date(val.updatedAt).toISOString() : null,
-      chatType: val.chatType || 'unknown',
-      origin: val.origin ? val.origin.surface : null,
-      lastTo: val.lastTo || null
-    })).sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || ''));
+    // Try to load group names from OpenClaw config or contacts
+    let groupNames = {};
+    try {
+      const contactsPath = path.join(getOpenClawHome(), 'contacts.json');
+      if (fs.existsSync(contactsPath)) {
+        const contacts = JSON.parse(fs.readFileSync(contactsPath, 'utf8'));
+        if (contacts.groups) for (const [id, info] of Object.entries(contacts.groups)) { groupNames[id] = info.name || info.subject; }
+      }
+    } catch {}
+
+    const sessions = Object.entries(data).map(([key, val]) => {
+      const origin = val.origin || {};
+      // Resolve friendly name
+      let friendlyName = null;
+      if (key.includes(':direct:')) {
+        const phone = key.split(':direct:')[1];
+        friendlyName = phone;
+      } else if (key.includes(':group:')) {
+        const groupId = key.split(':group:')[1];
+        friendlyName = groupNames[groupId] || null;
+      } else if (key.endsWith(':main')) {
+        friendlyName = 'Main Session';
+      } else if (key.includes(':cron:')) {
+        friendlyName = 'Cron: ' + key.split(':cron:')[1].substring(0, 8);
+      } else if (key.includes(':subagent:')) {
+        friendlyName = 'Sub-agent: ' + key.split(':subagent:')[1].substring(0, 12);
+      }
+      return {
+        key,
+        sessionId: val.sessionId,
+        updatedAt: val.updatedAt ? new Date(val.updatedAt).toISOString() : null,
+        updatedAtMs: val.updatedAt || 0,
+        chatType: val.chatType || origin.chatType || 'unknown',
+        surface: origin.surface || null,
+        label: origin.label || null,
+        friendlyName,
+        model: val.model || null,
+        lastTo: val.lastTo || null
+      };
+    }).sort((a, b) => (b.updatedAtMs || 0) - (a.updatedAtMs || 0));
     res.json(sessions);
   } catch (e) { res.json([]); }
 });
