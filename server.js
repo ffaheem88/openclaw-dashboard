@@ -1,4 +1,6 @@
-require('dotenv').config();
+// Load .env from user config dir first, then fallback to package dir
+const _userEnv = require('path').join(process.env.OPENCLAW_HOME || require('path').join(require('os').homedir(), '.openclaw'), 'dashboard', 'config', '.env');
+require('dotenv').config({ path: require('fs').existsSync(_userEnv) ? _userEnv : undefined });
 const express = require('express');
 const { execSync, spawn } = require('child_process');
 const fs = require('fs');
@@ -3230,8 +3232,8 @@ app.post('/api/setup/save', express.json(), (req, res) => {
     };
     fs.writeFileSync(path.join(configDir, 'dashboard-config.json'), JSON.stringify(dashConfig, null, 2));
 
-    // Write .env to dashboard directory
-    const envPath = path.join(__dirname, '.env');
+    // Write .env to user config directory (not npm package dir which may be root-owned)
+    const envPath = path.join(CONFIG_DIR, '.env');
     fs.writeFileSync(envPath, envLines.join('\n') + '\n');
 
     // Reload env vars in-process (no restart needed)

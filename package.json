@@ -1,6 +1,6 @@
 {
   "name": "@ffaheem88/openclaw-dashboard",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Self-hosted dashboard for OpenClaw AI agents — monitor sessions, costs, memory, crons, and more",
   "main": "server.js",
   "bin": {
