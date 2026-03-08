@@ -3093,7 +3093,7 @@ app.post('/api/setup/validate', express.json(), async (req, res) => {
 
 // ── Settings API (post-setup config management) ────────────────────────
 // Helper: read/write .env as key-value pairs
-const ENV_PATH = path.join(CONFIG_DIR, '..', '.env');
+const ENV_PATH = path.join(CONFIG_DIR, '.env');
 function readEnvFile() {
   try {
     const content = fs.readFileSync(ENV_PATH, 'utf8');
