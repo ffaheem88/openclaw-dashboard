@@ -66,7 +66,9 @@
     .chat-header .avatar{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
     .chat-header .avatar.session{background:rgba(6,182,212,.1)}
     .chat-header .avatar.provider{background:rgba(139,92,246,.1)}
-    .chat-header .target-name{font-weight:600;font-size:14px}
+    .chat-header .target-name{font-weight:600;font-size:14px;display:flex;align-items:center;gap:8px}
+    .live-dot{width:8px;height:8px;border-radius:50%;background:var(--red);animation:livePulse 1.5s infinite}
+    @keyframes livePulse{0%,100%{opacity:1;box-shadow:0 0 4px var(--red)}50%{opacity:.5;box-shadow:0 0 8px var(--red)}}
     .chat-header .target-info{font-size:11px;color:var(--muted)}
     .chat-header .header-right{margin-left:auto;display:flex;align-items:center;gap:10px}
     .chat-header select{padding:6px 10px;background:var(--glass);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:11px;font-family:inherit;cursor:pointer}
@@ -278,26 +280,33 @@ function scrollToBottom(){
   if(el) requestAnimationFrame(function(){el.scrollTop=el.scrollHeight});
 }
 
-function addMessage(role,content,time){
+function addMessage(role,content,time,sender){
   if(typeof content==='object'&&content!==null) content=content.text||content.message||'';
   content=String(content||'');
   if(!content.trim()||content.trim()==='[object Object]') return;
   var messages=document.getElementById('messages');
   var div=document.createElement('div');
   div.className='msg '+role;
-  div.innerHTML=formatContent(content);
-  if(time||role!=='system'){
-    var meta=document.createElement('div');
-    meta.className='msg-meta';
-    if(role!=='system'){
-      var roleEl=document.createElement('span');
-      roleEl.className='msg-role';
-      roleEl.textContent=role==='user'?'You':role==='assistant'?'AI':'';
-      if(roleEl.textContent) meta.appendChild(roleEl);
-    }
-    if(time){var t=document.createElement('span');t.className='msg-time';t.textContent=time;meta.appendChild(t)}
-    div.appendChild(meta);
+  // Show sender name for user messages in group sessions
+  if(sender&&role==='user'){
+    var senderEl=document.createElement('div');
+    senderEl.style.cssText='font-size:10px;font-weight:600;color:var(--cyan);margin-bottom:3px;opacity:.8';
+    senderEl.textContent=sender;
+    div.appendChild(senderEl);
   }
+  var contentEl=document.createElement('div');
+  contentEl.innerHTML=formatContent(content);
+  div.appendChild(contentEl);
+  var meta=document.createElement('div');
+  meta.className='msg-meta';
+  if(role!=='system'){
+    var roleEl=document.createElement('span');
+    roleEl.className='msg-role';
+    roleEl.textContent=sender||(role==='user'?'You':role==='assistant'?'AI':'');
+    if(roleEl.textContent) meta.appendChild(roleEl);
+  }
+  if(time){var t=document.createElement('span');t.className='msg-time';t.textContent=time;meta.appendChild(t)}
+  div.appendChild(meta);
   messages.appendChild(div);
   scrollToBottom();
 }
@@ -388,6 +397,7 @@ function quickSelect(modelId){
 }
 
 function selectTarget(el){
+  stopLivePolling();
   document.querySelectorAll('.target-item').forEach(function(t){t.classList.remove('active')});
   el.classList.add('active');
   // Close mobile sidebar
@@ -401,11 +411,11 @@ function selectTarget(el){
   if(type==='session'){
     currentTarget.key=el.dataset.key;
     currentTarget.name=el.querySelector('.name').textContent;
-    document.getElementById('headerName').textContent=currentTarget.name;
-    document.getElementById('headerInfo').textContent='📖 History + Steer · '+currentTarget.key;
+    document.getElementById('headerName').innerHTML='<span class="live-dot"></span>'+escapeHtml(currentTarget.name);
+    document.getElementById('headerInfo').textContent='Live · auto-refreshing every 3s';
     avatarEl.textContent=el.querySelector('.icon').textContent;
     avatarEl.className='avatar session';
-    document.getElementById('msgInput').placeholder='Send a steer message (queued)...';
+    document.getElementById('msgInput').placeholder='Send a message to this conversation...';
   } else {
     currentTarget.model=el.dataset.model;
     currentTarget.name=el.querySelector('.name').textContent;
@@ -424,38 +434,11 @@ function selectTarget(el){
   messages.innerHTML='';
   var histKey=type==='session'?currentTarget.key:currentTarget.model;
 
-  if(chatHistory[histKey]){
+  if(type==='session'){
+    loadSessionMessages(currentTarget.key, false);
+    startLivePolling();
+  } else if(chatHistory[histKey]){
     chatHistory[histKey].forEach(function(m){addMessage(m.role,m.content,m.time)});
-  } else if(type==='session'){
-    addMessage('system','Loading history...');
-    fetch('/api/live/session?key='+encodeURIComponent(currentTarget.key)+'&limit=30',{credentials:'same-origin'})
-      .then(function(r){return r.json()}).then(function(d){
-        messages.innerHTML='';
-        var count=0;
-        (d.messages||[]).forEach(function(m){
-          if(m.role!=='user'&&m.role!=='assistant') return;
-          var text=m.content||'';
-          if(typeof text==='object') text=text.text||'';
-          if(!text) return;
-          // Strip metadata
-          var lines=text.split('\n');var clean=[];var inMeta=false;
-          for(var i=0;i<lines.length;i++){
-            var ln=lines[i];
-            if(ln.indexOf('Conversation info')===0||ln.indexOf('Sender (untrusted')===0||ln.indexOf('[Queued messages')===0||ln.indexOf('[media attached:')===0||ln.indexOf('To send an image back')===0){inMeta=true;continue}
-            if(inMeta&&(ln.trim()==='```'||ln.trim()==='```json'||ln.trim().startsWith('"')||ln.trim().startsWith('{')||ln.trim().startsWith('}')||ln.trim()==='---'||ln.trim()===''))continue;
-            if(inMeta&&ln.trim()!==''&&!ln.trim().startsWith('"')&&!ln.trim().startsWith('{')&&!ln.trim().startsWith('}')){inMeta=false}
-            if(!inMeta) clean.push(ln);
-          }
-          text=clean.join('\n').trim();
-          if(!text||text==='NO_REPLY'||text==='HEARTBEAT_OK') return;
-          if(text.includes('"schema":"openclaw.inbound_meta')||text.includes('"schema": "openclaw.inbound_meta')) return;
-          addMessage(m.role,text);
-          count++;
-        });
-        if(!count) addMessage('system','No messages yet.');
-        addMessage('system','📖 Read-only history. Messages you send are queued — the agent picks them up on its next turn. For instant replies, use a Direct Provider below.');
-        scrollToBottom();
-      }).catch(function(){messages.innerHTML='';addMessage('system','Could not load history')});
   } else {
     addMessage('system','Direct chat with '+currentTarget.name+'. Send a message to start.');
   }
@@ -490,8 +473,13 @@ function sendMessage(){
       document.getElementById('typingIndicator').classList.remove('show');
       sendBtn.disabled=false;
       if(d.error){addMessage('system','Error: '+d.error);return}
-      var resp=d.response||'';
-      if(resp) addMessage('system',resp);
+      if(d.mode==='channel'){
+        // Message sent to channel — will appear via live polling
+        toast('Message sent','success');
+      } else {
+        var resp=d.response||'';
+        if(resp) addMessage('system',resp);
+      }
     }).catch(function(e){
       document.getElementById('typingIndicator').classList.remove('show');
       sendBtn.disabled=false;
@@ -526,6 +514,72 @@ function sendMessage(){
 }
 
 function updateModel(){}
+
+// ─── Live Session Polling ───
+var pollTimer=null;
+var lastTimestamp=null;
+var lastFileSize=0;
+var seenMessages=new Set();
+
+function stopLivePolling(){
+  if(pollTimer){clearInterval(pollTimer);pollTimer=null}
+  lastTimestamp=null;lastFileSize=0;seenMessages.clear();
+}
+
+function startLivePolling(){
+  stopLivePolling();
+  pollTimer=setInterval(function(){
+    if(!currentTarget||currentTarget.type!=='session') return stopLivePolling();
+    pollNewMessages();
+  },3000);
+}
+
+function msgKey(m){return(m.role||'')+'|'+(m.timestamp||'')+'|'+(m.content||'').substring(0,50)}
+
+function loadSessionMessages(key, isRefresh){
+  var messages=document.getElementById('messages');
+  if(!isRefresh) messages.innerHTML='';
+  seenMessages.clear();
+  fetch('/api/live/session?key='+encodeURIComponent(key)+'&limit=50',{credentials:'same-origin'})
+    .then(function(r){return r.json()}).then(function(d){
+      if(!isRefresh) messages.innerHTML='';
+      var count=0;
+      (d.messages||[]).forEach(function(m){
+        var mk=msgKey(m);
+        if(seenMessages.has(mk)) return;
+        seenMessages.add(mk);
+        var label=m.sender||null;
+        addMessage(m.role,m.content,null,label);
+        count++;
+      });
+      if(!count&&!isRefresh) addMessage('system','No messages yet. Send a message to start the conversation.');
+      lastTimestamp=d.messages&&d.messages.length?d.messages[d.messages.length-1].timestamp:null;
+      lastFileSize=d.fileSize||0;
+      scrollToBottom();
+    }).catch(function(){if(!isRefresh){messages.innerHTML='';addMessage('system','Could not load history')}});
+}
+
+function pollNewMessages(){
+  if(!currentTarget||currentTarget.type!=='session') return;
+  var url='/api/live/session?key='+encodeURIComponent(currentTarget.key)+'&limit=10';
+  if(lastTimestamp) url+='&since='+encodeURIComponent(lastTimestamp);
+  fetch(url,{credentials:'same-origin'}).then(function(r){return r.json()}).then(function(d){
+    if(!d.messages||!d.messages.length) return;
+    var added=false;
+    d.messages.forEach(function(m){
+      var mk=msgKey(m);
+      if(seenMessages.has(mk)) return;
+      seenMessages.add(mk);
+      var label=m.sender||null;
+      addMessage(m.role,m.content,null,label);
+      added=true;
+    });
+    if(added){
+      lastTimestamp=d.messages[d.messages.length-1].timestamp;
+      lastFileSize=d.fileSize||0;
+    }
+  }).catch(function(){});
+}
 
 loadTargets();
 </script>

@@ -3964,66 +3964,93 @@ app.get('/api/live/sessions', requireAuth, (req, res) => {
   } catch (e) { res.json([]); }
 });
 
-// GET /api/live/session?key=...&limit=100 — read session log
+// Helper: extract clean text from a JSONL message entry
+function extractMessageText(obj) {
+  if (obj.type !== 'message' || !obj.message) return null;
+  const msg = obj.message;
+  const role = msg.role;
+  if (role !== 'user' && role !== 'assistant') return null;
+
+  let textParts = [];
+  if (typeof msg.content === 'string') {
+    textParts = [msg.content];
+  } else if (Array.isArray(msg.content)) {
+    textParts = msg.content.filter(c => c.type === 'text' && c.text).map(c => c.text);
+  }
+  textParts = textParts.filter(t => {
+    const trimmed = t.trim();
+    if (trimmed === 'NO_REPLY' || trimmed === 'HEARTBEAT_OK') return false;
+    if (trimmed.startsWith('Conversation info (untrusted metadata)')) return false;
+    if (trimmed.startsWith('Sender (untrusted metadata)')) return false;
+    if (trimmed.includes('"schema": "openclaw.inbound_meta')) return false;
+    if (trimmed.startsWith('[Queued messages while agent was busy]')) return false;
+    if (/^\[media attached:/.test(trimmed)) return false;
+    if (trimmed.startsWith('To send an image back, prefer the message tool')) return false;
+    return true;
+  });
+  const text = textParts.join('\n').trim();
+  if (!text) return null;
+
+  // Extract sender name from user message metadata if present
+  let sender = null;
+  if (role === 'user') {
+    // Check for sender in the raw content (before filtering)
+    const rawParts = Array.isArray(msg.content) ? msg.content.filter(c => c.type === 'text').map(c => c.text) : [msg.content];
+    for (const part of rawParts) {
+      const senderMatch = part.match(/"sender":\s*"([^"]+)"/);
+      if (senderMatch) { sender = senderMatch[1]; break; }
+    }
+  }
+
+  return { role, content: text, sender, timestamp: obj.timestamp || msg.timestamp };
+}
+
+// GET /api/live/session?key=...&limit=100&since=<timestamp> — read session log
 app.get('/api/live/session', requireAuth, (req, res) => {
   try {
     const sjPath = path.join(getSessionsDir(), 'sessions.json');
     const data = JSON.parse(fs.readFileSync(sjPath, 'utf8'));
     const key = req.query.key;
     const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 100, 1), 500);
+    const since = req.query.since ? new Date(req.query.since).getTime() : 0;
     if (!key || !data[key]) return res.json({ error: 'Session not found' });
     const entry = data[key];
     const logFile = entry.sessionFile;
     if (!logFile || !fs.existsSync(logFile)) return res.json({ error: 'Session log not found', updatedAt: entry.updatedAt ? new Date(entry.updatedAt).toISOString() : null });
+    
     const content = fs.readFileSync(logFile, 'utf8');
     const lines = content.trim().split('\n');
     const messages = [];
-    for (const line of lines.slice(-limit * 3)) {
+    const lineCount = since ? lines.length : Math.min(lines.length, limit * 3);
+    const startIdx = since ? 0 : Math.max(0, lines.length - lineCount);
+    
+    for (let i = startIdx; i < lines.length; i++) {
       try {
-        const obj = JSON.parse(line);
-        if (obj.type === 'message' && obj.message) {
-          const msg = obj.message;
-          const role = msg.role;
-          // Only show user and assistant messages
-          if (role !== 'user' && role !== 'assistant') continue;
-          // Extract text content, filtering out metadata and noise
-          let textParts = [];
-          if (typeof msg.content === 'string') {
-            textParts = [msg.content];
-          } else if (Array.isArray(msg.content)) {
-            textParts = msg.content
-              .filter(c => c.type === 'text' && c.text)
-              .map(c => c.text);
-          }
-          // Filter out metadata blocks, NO_REPLY, etc from each part
-          textParts = textParts.filter(t => {
-            const trimmed = t.trim();
-            if (trimmed === 'NO_REPLY' || trimmed === 'HEARTBEAT_OK') return false;
-            if (trimmed.startsWith('Conversation info (untrusted metadata)')) return false;
-            if (trimmed.startsWith('Sender (untrusted metadata)')) return false;
-            if (trimmed.includes('"schema": "openclaw.inbound_meta')) return false;
-            if (trimmed.startsWith('[Queued messages while agent was busy]')) return false;
-            if (/^\[media attached:/.test(trimmed)) return false;
-            if (trimmed.startsWith('To send an image back, prefer the message tool')) return false;
-            return true;
-          });
-          const text = textParts.join('\n').trim();
-          if (!text) continue;
-          messages.push({
-            type: 'message',
-            role,
-            content: text,
-            timestamp: obj.timestamp || msg.timestamp,
-          });
+        const obj = JSON.parse(lines[i]);
+        // Skip messages before the 'since' timestamp
+        const ts = obj.timestamp || (obj.message && obj.message.timestamp);
+        if (since && ts) {
+          const msgTime = new Date(ts).getTime();
+          if (msgTime <= since) continue;
         }
+        const extracted = extractMessageText(obj);
+        if (extracted) messages.push({ ...extracted, lineNum: i });
       } catch {}
     }
+
+    // Get file size for change detection
+    const stat = fs.statSync(logFile);
+    
     res.json({
       key,
       sessionId: entry.sessionId,
       updatedAt: entry.updatedAt ? new Date(entry.updatedAt).toISOString() : null,
       chatType: entry.chatType,
-      messages: messages.slice(-limit)
+      channel: entry.channel || entry.origin?.surface,
+      groupId: entry.groupId,
+      messages: since ? messages : messages.slice(-limit),
+      fileSize: stat.size,
+      lineCount: lines.length
     });
   } catch (e) { res.json({ error: e.message }); }
 });
@@ -4043,26 +4070,70 @@ app.post('/api/agent/steer', express.json(), requireAuth, (req, res) => {
   res.json({ ok: true });
 });
 
-// POST /api/chat/session — send message to a session
-// Sessions are tree-restricted, so we can't inject messages directly.
-// Instead: for the main session, use gateway /tools/invoke with sessions_send.
-// For other sessions, write a steer request the agent will pick up.
+// POST /api/chat/session — inject message into session via channel
 app.post('/api/chat/session', requireAuth, async (req, res) => {
   const { key, message } = req.body || {};
   if (!key || !message) return res.status(400).json({ error: 'key and message required' });
   try {
-    // Write steer request — the agent picks these up
+    // Read session metadata to find the channel target
+    const sjPath = path.join(getSessionsDir(), 'sessions.json');
+    const sessData = JSON.parse(fs.readFileSync(sjPath, 'utf8'));
+    const entry = sessData[key];
+    if (!entry) return res.json({ error: 'Session not found' });
+
+    // Read gateway token
+    const ocConfigPath = path.join(getOpenClawHome(), 'openclaw.json');
+    let gwToken = '', gwPort = 18789;
+    try {
+      const ocConfig = JSON.parse(fs.readFileSync(ocConfigPath, 'utf8'));
+      gwToken = ocConfig?.gateway?.auth?.token || '';
+      gwPort = ocConfig?.gateway?.port || 18789;
+    } catch {}
+
+    if (!gwToken) return res.json({ error: 'Gateway token not configured' });
+
+    // Determine target based on session type
+    const channel = entry.channel || entry.origin?.surface;
+    const chatTarget = entry.lastTo || entry.groupId || entry.origin?.to;
+
+    if (channel && chatTarget) {
+      // Send via the message tool through gateway — this injects into the actual conversation
+      const response = await fetch(`http://127.0.0.1:${gwPort}/tools/invoke`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${gwToken}` },
+        body: JSON.stringify({
+          tool: 'message',
+          args: { action: 'send', channel, target: chatTarget, message },
+          sessionKey: key
+        }),
+        signal: AbortSignal.timeout(30000)
+      });
+
+      if (response.ok) {
+        const data = await response.json().catch(() => ({}));
+        return res.json({ ok: true, response: '✅ Sent to ' + channel, mode: 'channel' });
+      }
+    }
+
+    // Fallback: try sessions_send
+    const response = await fetch(`http://127.0.0.1:${gwPort}/tools/invoke`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${gwToken}` },
+      body: JSON.stringify({ tool: 'sessions_send', args: { sessionKey: key, message } }),
+      signal: AbortSignal.timeout(30000)
+    }).catch(() => null);
+
+    if (response && response.ok) {
+      return res.json({ ok: true, response: '✅ Message injected into session', mode: 'session_send' });
+    }
+
+    // Last resort: steer file
     const steerFile = path.join(CONFIG_DIR, 'steer-requests.json');
     let requests = [];
     try { requests = JSON.parse(fs.readFileSync(steerFile, 'utf8')); } catch {}
     requests.push({ key, message, timestamp: new Date().toISOString(), status: 'pending' });
     fs.writeFileSync(steerFile, JSON.stringify(requests, null, 2));
-    
-    res.json({ 
-      ok: true, 
-      response: '📨 Message queued. The agent will see this on its next turn.',
-      mode: 'steer'
-    });
+    res.json({ ok: true, response: '📨 Queued for agent pickup', mode: 'steer' });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
