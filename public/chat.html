@@ -402,16 +402,18 @@ function selectTarget(el){
     currentTarget.key=el.dataset.key;
     currentTarget.name=el.querySelector('.name').textContent;
     document.getElementById('headerName').textContent=currentTarget.name;
-    document.getElementById('headerInfo').textContent=currentTarget.key;
+    document.getElementById('headerInfo').textContent='📖 History + Steer · '+currentTarget.key;
     avatarEl.textContent=el.querySelector('.icon').textContent;
     avatarEl.className='avatar session';
+    document.getElementById('msgInput').placeholder='Send a steer message (queued)...';
   } else {
     currentTarget.model=el.dataset.model;
     currentTarget.name=el.querySelector('.name').textContent;
     document.getElementById('headerName').textContent=currentTarget.name;
-    document.getElementById('headerInfo').textContent=currentTarget.model;
+    document.getElementById('headerInfo').textContent='⚡ Instant replies · '+currentTarget.model;
     avatarEl.textContent=el.querySelector('.icon').textContent;
     avatarEl.className='avatar provider';
+    document.getElementById('msgInput').placeholder='Type a message...';
   }
 
   document.getElementById('emptyState').style.display='none';
@@ -451,7 +453,7 @@ function selectTarget(el){
           count++;
         });
         if(!count) addMessage('system','No messages yet.');
-        addMessage('system','📨 Messages sent here are queued as steer requests.');
+        addMessage('system','📖 Read-only history. Messages you send are queued — the agent picks them up on its next turn. For instant replies, use a Direct Provider below.');
         scrollToBottom();
       }).catch(function(){messages.innerHTML='';addMessage('system','Could not load history')});
   } else {
@@ -488,9 +490,8 @@ function sendMessage(){
       document.getElementById('typingIndicator').classList.remove('show');
       sendBtn.disabled=false;
       if(d.error){addMessage('system','Error: '+d.error);return}
-      var resp=d.response||'(sent)';
-      addMessage('assistant',resp,new Date().toLocaleTimeString());
-      chatHistory[histKey].push({role:'assistant',content:resp,time:new Date().toLocaleTimeString()});
+      var resp=d.response||'';
+      if(resp) addMessage('system',resp);
     }).catch(function(e){
       document.getElementById('typingIndicator').classList.remove('show');
       sendBtn.disabled=false;
