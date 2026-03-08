@@ -1,14 +1,32 @@
 {
-  "name": "dashboard",
+  "name": "openclaw-dashboard",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+  "description": "Self-hosted dashboard for OpenClaw AI agents — monitor sessions, costs, memory, crons, and more",
+  "main": "server.js",
+  "bin": {
+    "openclaw-dashboard": "./bin/cli.js"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "keywords": [
+    "openclaw",
+    "dashboard",
+    "ai-agent",
+    "monitoring",
+    "llm"
+  ],
+  "author": "ffaheem88",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ffaheem88/openclaw-dashboard.git"
+  },
+  "homepage": "https://github.com/ffaheem88/openclaw-dashboard",
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "dependencies": {
     "bcryptjs": "^3.0.3",
     "better-sqlite3": "^12.6.2",
