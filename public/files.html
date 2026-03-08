@@ -91,7 +91,7 @@
       <a href="/agents.html">Agents</a>
       <a href="/neural.html">Neural</a>
       <a href="/settings.html">Settings</a>
-      <a href="/logout" style="color:var(--red)">Logout</a>
+      <a href="#" onclick="logout(event)" style="color:var(--red)">Logout</a>
     </div>
   </div>
 
@@ -135,6 +135,21 @@ var currentFile = null;
 var originalContent = '';
 var isPreviewMode = false;
 var searchTimeout = null;
+
+function escapeHtml(text) {
+  var div = document.createElement('div');
+  div.textContent = text == null ? '' : String(text);
+  return div.innerHTML;
+}
+
+function jsString(value) {
+  return JSON.stringify(String(value == null ? '' : value));
+}
+
+function logout(event){
+  if (event) event.preventDefault();
+  fetch('/logout', { method:'POST' }).then(function(){ window.location = '/login'; });
+}
 
 function toast(msg, type) {
   var t = document.getElementById('toast');
@@ -192,22 +207,22 @@ function loadTree() {
     // Root files first
     rootFiles.sort(function(a,b){return a.name.localeCompare(b.name)});
     rootFiles.forEach(function(f) {
-      html += '<div class="file-item" onclick="openFile(\'' + f.path + '\')" data-path="' + f.path + '">' +
+      html += '<div class="file-item" onclick=\'openFile(' + jsString(f.path) + ')\' data-path="' + escapeHtml(f.path) + '">' +
         '<span class="icon">' + getIcon(f.name) + '</span>' +
-        '<span class="name">' + f.name + '</span>' +
+        '<span class="name">' + escapeHtml(f.name) + '</span>' +
         '<span class="meta">' + formatSize(f.size) + '</span></div>';
     });
 
     // Directories
     Object.keys(dirs).sort().forEach(function(dir) {
       html += '<div class="file-item dir-item" onclick="toggleDir(this)">' +
-        '<span class="icon">📁</span><span class="name">' + dir + '/</span>' +
+        '<span class="icon">📁</span><span class="name">' + escapeHtml(dir) + '/</span>' +
         '<span class="meta">' + dirs[dir].length + ' files</span></div>';
       html += '<div class="dir-children">';
       dirs[dir].sort(function(a,b){return a.name.localeCompare(b.name)}).forEach(function(f) {
-        html += '<div class="file-item" onclick="openFile(\'' + f.path + '\')" data-path="' + f.path + '">' +
+        html += '<div class="file-item" onclick=\'openFile(' + jsString(f.path) + ')\' data-path="' + escapeHtml(f.path) + '">' +
           '<span class="icon">' + getIcon(f.name) + '</span>' +
-          '<span class="name">' + f.name + '</span>' +
+          '<span class="name">' + escapeHtml(f.name) + '</span>' +
           '<span class="meta">' + formatSize(f.size) + '</span></div>';
       });
       html += '</div>';
@@ -301,6 +316,12 @@ function togglePreview() {
 
 function renderPreview() {
   var content = document.getElementById('editor').value;
+  function sanitizeHref(url) {
+    var trimmed = String(url || '').trim();
+    if (/^(https?:|mailto:)/i.test(trimmed)) return trimmed;
+    if (/^(\/|\.\/|\.\.\/)/.test(trimmed)) return trimmed;
+    return '';
+  }
   var html = content
     .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
     .replace(/^### (.+)$/gm, '<h3>$1</h3>')
@@ -312,7 +333,11 @@ function renderPreview() {
     .replace(/^- (.+)$/gm, '<li>$1</li>')
     .replace(/^---$/gm, '<hr>')
     .replace(/^\> (.+)$/gm, '<blockquote>$1</blockquote>')
-    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>')
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, function(_, label, href) {
+      var safeHref = sanitizeHref(href);
+      if (!safeHref) return label;
+      return '<a href="' + escapeHtml(safeHref) + '" target="_blank" rel="noopener noreferrer">' + label + '</a>';
+    })
     .replace(/\n\n/g, '</p><p>')
     .replace(/\n/g, '<br>');
   document.getElementById('previewPane').innerHTML = '<p>' + html + '</p>';
@@ -335,9 +360,9 @@ function searchFiles(query) {
     }
     var html = '<div class="search-results">';
     data.results.forEach(function(r) {
-      html += '<div class="search-result" onclick="openFile(\'' + r.file + '\')">' +
-        '<div class="sr-path">' + r.file + ':' + r.line + '</div>' +
-        '<div class="sr-line">' + (r.text || '').substring(0, 120) + '</div></div>';
+      html += '<div class="search-result" onclick=\'openFile(' + jsString(r.file) + ')\'>' +
+        '<div class="sr-path">' + escapeHtml(r.file) + ':' + r.line + '</div>' +
+        '<div class="sr-line">' + escapeHtml((r.text || '').substring(0, 120)) + '</div></div>';
     });
     html += '</div>';
     tree.innerHTML = html;
@@ -353,6 +378,10 @@ document.addEventListener('keydown', function(e) {
 });
 
 loadTree();
+var openParam = new URLSearchParams(window.location.search).get('open');
+if (openParam) {
+  setTimeout(function(){ openFile(openParam); }, 100);
+}
 function toggleMobileNav(){document.querySelector(".nav").classList.toggle("open");var o=document.querySelector(".mobile-overlay");o.classList.toggle("open");o.style.display=o.classList.contains("open")?"block":"none";}
 </script>
 </body>

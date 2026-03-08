@@ -109,9 +109,9 @@
 
   <div class="main">
     <div class="tabs">
-      <button class="tab active" onclick="switchTab('crons')">⏰ Cron Jobs</button>
-      <button class="tab" onclick="switchTab('heartbeat')">💓 Heartbeat</button>
-      <button class="tab" onclick="switchTab('history')">📜 Run History</button>
+      <button class="tab active" onclick="switchTab('crons', event)">⏰ Cron Jobs</button>
+      <button class="tab" onclick="switchTab('heartbeat', event)">💓 Heartbeat</button>
+      <button class="tab" onclick="switchTab('history', event)">📜 Run History</button>
     </div>
 
     <!-- Cron Jobs Tab -->
@@ -219,10 +219,10 @@
     let allRuns = [];
 
     // Tab switching
-    function switchTab(tab) {
+    function switchTab(tab, event) {
       document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
       document.querySelectorAll('[id^="tab-"]').forEach(t => t.style.display = 'none');
-      event.target.classList.add('active');
+      if (event && event.target) event.target.classList.add('active');
       document.getElementById('tab-' + tab).style.display = 'block';
       if (tab === 'heartbeat') loadHeartbeat();
       if (tab === 'history') loadHistory();
@@ -303,6 +303,8 @@
         const payload = j.payload || {};
         const delivery = j.delivery || {};
         const taskPreview = (payload.message || '').substring(0, 200) + ((payload.message||'').length > 200 ? '...' : '');
+        const safeId = JSON.stringify(j.id || '');
+        const safeName = JSON.stringify(j.name || j.id || '');
         return `<div class="card">
           <div class="card-header">
             <div class="card-title">
@@ -323,10 +325,10 @@
           ${dots ? `<div style="margin-bottom:8px"><span style="font-size:11px;color:var(--muted)">Recent runs: </span><div class="run-dots" style="display:inline-flex">${dots}</div></div>` : ''}
           <div class="task-preview">${escHtml(taskPreview)}</div>
           <div class="actions" style="margin-top:12px">
-            <button class="btn btn-cyan" onclick="runNow('${j.id}')">▶️ Run Now</button>
-            <button class="btn ${enabled ? 'btn-amber' : 'btn-green'}" onclick="toggleCron('${j.id}', ${!enabled})">${enabled ? '⏸️ Disable' : '▶️ Enable'}</button>
-            <button class="btn" onclick="editCron('${j.id}')">✏️ Edit</button>
-            <button class="btn btn-red" onclick="deleteCron('${j.id}', '${escHtml(j.name || j.id)}')">🗑️ Delete</button>
+            <button class="btn btn-cyan" onclick='runNow(${safeId})'>▶️ Run Now</button>
+            <button class="btn ${enabled ? 'btn-amber' : 'btn-green'}" onclick='toggleCron(${safeId}, ${!enabled})'>${enabled ? '⏸️ Disable' : '▶️ Enable'}</button>
+            <button class="btn" onclick='editCron(${safeId})'>✏️ Edit</button>
+            <button class="btn btn-red" onclick='deleteCron(${safeId}, ${safeName})'>🗑️ Delete</button>
           </div>
         </div>`;
       }).join('');
@@ -427,7 +429,7 @@
     // Heartbeat
     async function loadHeartbeat() {
       try {
-        const res = await fetch('/api/files/read?path=HEARTBEAT.md');
+        const res = await fetch('/api/workspace/file?path=HEARTBEAT.md');
         const data = await res.json();
         document.getElementById('heartbeat-content').value = data.content || '# HEARTBEAT.md\n\n## Tasks\n\n- Add your heartbeat tasks here\n';
       } catch (e) {
@@ -438,7 +440,7 @@
     async function saveHeartbeat() {
       try {
         const content = document.getElementById('heartbeat-content').value;
-        const res = await fetch('/api/files/write', {
+        const res = await fetch('/api/workspace/file', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ path: 'HEARTBEAT.md', content })

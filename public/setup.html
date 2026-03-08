@@ -204,8 +204,8 @@
           </div>
           <div class="form-group">
             <label>Admin Password</label>
-            <input type="password" id="adminPass" placeholder="Choose a password" autocomplete="new-password" minlength="4">
-            <div class="hint">Minimum 4 characters</div>
+            <input type="password" id="adminPass" placeholder="Choose a password" autocomplete="new-password" minlength="8">
+            <div class="hint">Minimum 8 characters</div>
             <div class="error-text" id="passError"></div>
           </div>
         </div>
@@ -459,8 +459,8 @@ function updateSteps() {
 function nextStep() {
   if (currentStep === 0) {
     const pass = document.getElementById('adminPass').value;
-    if (!pass || pass.length < 4) {
-      document.getElementById('passError').textContent = 'Password must be at least 4 characters';
+    if (!pass || pass.length < 8) {
+      document.getElementById('passError').textContent = 'Password must be at least 8 characters';
       return;
     }
     document.getElementById('passError').textContent = '';
@@ -478,16 +478,18 @@ function prevStep() {
 function buildSummary() {
   const features = getSelectedFeatures();
   const lines = [
-    `<b>OpenClaw Home:</b> ${document.getElementById('openclawHome').value}`,
-    `<b>Agent:</b> ${document.getElementById('agentName').value}`,
-    `<b>Port:</b> ${document.getElementById('port').value}`,
-    `<b>Admin:</b> ${document.getElementById('adminUser').value}`,
-    `<b>Features:</b> Dashboard, Cost Tracking${features.length ? ', ' + features.join(', ') : ''}`,
+    'OpenClaw Home: ' + document.getElementById('openclawHome').value,
+    'Agent: ' + document.getElementById('agentName').value,
+    'Port: ' + document.getElementById('port').value,
+    'Admin: ' + document.getElementById('adminUser').value,
+    'Features: Dashboard, Cost Tracking' + (features.length ? ', ' + features.join(', ') : '')
   ];
-  if (document.getElementById('keyAnthropic').value) lines.push('<b>Anthropic:</b> ✅ configured');
-  if (document.getElementById('keyOpenRouter').value) lines.push('<b>OpenRouter:</b> ✅ configured');
-  if (document.getElementById('keyOpenAI').value) lines.push('<b>OpenAI:</b> ✅ configured');
-  document.getElementById('summaryList').innerHTML = lines.join('<br>');
+  if (document.getElementById('keyAnthropic').value) lines.push('Anthropic: configured');
+  if (document.getElementById('keyOpenRouter').value) lines.push('OpenRouter: configured');
+  if (document.getElementById('keyOpenAI').value) lines.push('OpenAI: configured');
+  const summary = document.getElementById('summaryList');
+  summary.textContent = lines.join('\n');
+  summary.style.whiteSpace = 'pre-line';
 }
 
 function getConfig() {
@@ -570,16 +572,15 @@ async function runInstall() {
 
     // Show health results
     const grid = document.getElementById('healthGrid');
+    grid.innerHTML = '';
     for (const check of (healthData.checks || [])) {
       const color = check.status === 'ok' ? 'green' : check.status === 'warn' ? 'yellow' : 'red';
-      grid.innerHTML += `
-        <div class="health-item">
-          <div class="health-dot ${color}"></div>
-          <div>
-            <div class="label">${check.name}</div>
-            <div class="detail">${check.detail || ''}</div>
-          </div>
-        </div>`;
+      const item = document.createElement('div');
+      item.className = 'health-item';
+      item.innerHTML = '<div class="health-dot ' + color + '"></div><div><div class="label"></div><div class="detail"></div></div>';
+      item.querySelector('.label').textContent = check.name || '';
+      item.querySelector('.detail').textContent = check.detail || '';
+      grid.appendChild(item);
     }
 
     setTimeout(() => {
@@ -634,7 +635,8 @@ async function autoDetect() {
             input.dataset.detected = 'true';
           }
           if (status) {
-            status.innerHTML = '<span class="status status-valid">✓ detected from OpenClaw config</span>';
+            status.textContent = '✓ detected from OpenClaw config';
+            status.className = 'status status-valid';
           }
         }
       }
@@ -662,18 +664,21 @@ async function validateKey(provider, inputId, statusId) {
   const status = document.getElementById(statusId);
   input.addEventListener('blur', async () => {
     const key = input.value.trim();
-    if (!key) { status.textContent = ''; return; }
-    status.innerHTML = '<span class="status status-checking">checking...</span>';
+    if (!key) { status.textContent = ''; status.className = 'status'; return; }
+    status.textContent = 'checking...';
+    status.className = 'status status-checking';
     try {
       const res = await fetch('/api/setup/validate', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ provider, key })
       });
       const data = await res.json();
-      status.innerHTML = data.valid
-        ? '<span class="status status-valid">✓ valid</span>'
-        : '<span class="status status-invalid">✗ invalid</span>';
-    } catch { status.innerHTML = '<span class="status status-invalid">✗ error</span>'; }
+      status.textContent = data.valid ? '✓ valid' : '✗ invalid';
+      status.className = 'status ' + (data.valid ? 'status-valid' : 'status-invalid');
+    } catch {
+      status.textContent = '✗ error';
+      status.className = 'status status-invalid';
+    }
   });
 }
 

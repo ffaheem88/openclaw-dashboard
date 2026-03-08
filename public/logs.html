@@ -184,17 +184,13 @@ body::before{
       <a href="neural.html">🧠 Neural</a>
       <a href="/settings.html">⚙️ Settings</a>
       <a href="/identity.html">🧠 Identity</a>
-      <a href="/logout" style="color: var(--accent-red, #ef4444);">⏏ Logout</a>
+      <a href="#" onclick="logout(event)" style="color: var(--accent-red, #ef4444);">⏏ Logout</a>
     </div>
   </div>
 
   <div class="controls">
-    <div class="service-tabs">
+    <div class="service-tabs" id="serviceTabs">
       <div class="service-tab active" data-svc="openclaw" onclick="selectService('openclaw')"><span class="svc-dot unknown" id="dot-openclaw"></span>openclaw</div>
-      <div class="service-tab" data-svc="clawdbot-dashboard" onclick="selectService('clawdbot-dashboard')"><span class="svc-dot unknown" id="dot-clawdbot-dashboard"></span>dashboard</div>
-      <div class="service-tab" data-svc="cloudflared-dashboard" onclick="selectService('cloudflared-dashboard')"><span class="svc-dot unknown" id="dot-cloudflared-dashboard"></span>cloudflared</div>
-      <div class="service-tab" data-svc="searxng" onclick="selectService('searxng')"><span class="svc-dot unknown" id="dot-searxng"></span>searxng</div>
-      <div class="service-tab" data-svc="ollama" onclick="selectService('ollama')"><span class="svc-dot unknown" id="dot-ollama"></span>ollama</div>
     </div>
     <div class="controls-right">
       <select class="line-select" id="lineCount" onchange="fetchLogs()">
@@ -242,7 +238,12 @@ function classifyLine(text) {
 }
 
 function escapeHtml(s) {
-  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function logout(event){
+  if (event) event.preventDefault();
+  fetch('/logout', { method:'POST' }).then(function(){ window.location = '/login'; });
 }
 
 // Highlight occurrences of `kw` inside already-HTML-escaped text.
@@ -336,7 +337,7 @@ async function fetchLogs() {
     const r = await fetch(`/api/logs/tail?service=${currentService}&lines=${lines}`, { credentials: 'same-origin' });
     const data = await r.json();
     if (data.error) {
-      container.innerHTML = `<div class="log-status" style="color:var(--accent-red)">${data.error}</div>`;
+      container.innerHTML = `<div class="log-status" style="color:var(--accent-red)">${escapeHtml(data.error)}</div>`;
       return;
     }
     rawLogLines = data.lines || [];
@@ -345,7 +346,7 @@ async function fetchLogs() {
     document.getElementById('logService').textContent = `Service: ${data.service}`;
     document.getElementById('logTimestamp').textContent = `Fetched: ${new Date(data.timestamp).toLocaleTimeString()}`;
   } catch(e) {
-    container.innerHTML = `<div class="log-status" style="color:var(--accent-red)">Failed to fetch logs: ${e.message}</div>`;
+    container.innerHTML = `<div class="log-status" style="color:var(--accent-red)">Failed to fetch logs: ${escapeHtml(e.message)}</div>`;
   }
 }
 
@@ -366,6 +367,14 @@ async function loadServiceStatus() {
     const r = await fetch('/api/logs/services-status', { credentials: 'same-origin' });
     if (!r.ok) return;
     const data = await r.json();
+    var tabs = document.getElementById('serviceTabs');
+    var allowed = data.allowed || Object.keys(data.services || {});
+    if (allowed.length) {
+      tabs.innerHTML = allowed.map(function(svc) {
+        return '<div class="service-tab' + (svc === currentService ? ' active' : '') + '" data-svc="' + escapeHtml(svc) + '" onclick=\'selectService(' + JSON.stringify(svc) + ')\'><span class="svc-dot unknown" id="dot-' + escapeHtml(svc) + '"></span>' + escapeHtml(svc) + '</div>';
+      }).join('');
+      if (!allowed.includes(currentService)) currentService = allowed[0];
+    }
     const svcs = data.services || {};
     for (const [svc, state] of Object.entries(svcs)) {
       const dot = document.getElementById('dot-' + svc);

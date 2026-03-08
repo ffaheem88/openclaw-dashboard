@@ -470,7 +470,7 @@
         <a href="/neural.html" class="nav-link">🧠 Neural</a>
         <a href="/logs.html" class="nav-link">📋 Logs</a>
         <a href="/identity.html" class="nav-link active">🧠 Identity</a>
-        <a href="/logout" class="nav-link" style="color: var(--accent-rose, #ef4444);">⏏ Logout</a>
+        <a href="#" onclick="logout(event)" class="nav-link" style="color: var(--accent-rose, #ef4444);">⏏ Logout</a>
       </div>
     </div>
   </div>
@@ -672,12 +672,13 @@
       allFiles = files;
       const coreFiles = files.filter(f => f.category === 'core');
       const memFiles  = files.filter(f => f.category === 'memory');
+      const q = (value) => JSON.stringify(String(value == null ? '' : value));
 
       let html = '<div class="section-label">CORE FILES</div>';
       for (const f of coreFiles) {
         const icon = CORE_ICONS[f.name] || '📄';
         const active = currentFile === f.path ? ' active' : '';
-        html += `<div class="file-item${active}" onclick="loadFile('${f.path}')" data-path="${f.path}">
+        html += `<div class="file-item${active}" onclick='loadFile(${q(f.path)})' data-path="${escapeHtml(f.path)}">
           <span class="file-icon">${icon}</span>
           <div class="file-info">
             <div class="file-name">${escapeHtml(f.name)}</div>
@@ -695,7 +696,7 @@
       html += `<div class="memory-list ${listClass}" id="memoryList">`;
       for (const f of memFiles) {
         const active = currentFile === f.path ? ' active' : '';
-        html += `<div class="file-item${active}" onclick="loadFile('${f.path}')" data-path="${f.path}">
+        html += `<div class="file-item${active}" onclick='loadFile(${q(f.path)})' data-path="${escapeHtml(f.path)}">
           <span class="file-icon">📝</span>
           <div class="file-info">
             <div class="file-name">${escapeHtml(f.name)}</div>
@@ -828,7 +829,7 @@
         return;
       }
 
-      statusEl.innerHTML = `<span style="color:var(--accent-cyan);">${totalMatches} match${totalMatches !== 1 ? 'es' : ''}</span> in ${totalFiles} file${totalFiles !== 1 ? 's' : ''}`;
+      statusEl.textContent = `${totalMatches} match${totalMatches !== 1 ? 'es' : ''} in ${totalFiles} file${totalFiles !== 1 ? 's' : ''}`;
       document.getElementById('fileTree').style.display = 'none';
       resultsEl.style.display = 'block';
 
@@ -843,7 +844,7 @@
       for (const [filePath, matches] of Object.entries(byFile)) {
         const icon = CORE_ICONS[filePath.split('/').pop()] || (filePath.startsWith('memory/') ? '📝' : '📄');
         html += `<div style="margin-bottom:10px;">
-          <div onclick="loadFile('${escapeHtml(filePath)}'); clearSearch(true);"
+          <div onclick='loadFile(${JSON.stringify(filePath)}); clearSearch(true);'
                style="display:flex;align-items:center;gap:6px;padding:6px 8px;border-radius:8px;cursor:pointer;
                       background:rgba(6,182,212,0.08);border:1px solid rgba(6,182,212,0.2);margin-bottom:4px;
                       transition:background 0.15s;"
@@ -881,6 +882,7 @@
     }
 
     initPage();
+    function logout(event){if(event)event.preventDefault();fetch('/logout',{method:'POST'}).then(function(){window.location='/login';});}
   function toggleMobileNav(){var n=document.querySelector(".nav-links");n.classList.toggle("open");var o=document.querySelector(".mobile-overlay");o.classList.toggle("open");o.style.display=o.classList.contains("open")?"block":"none";}
 </script>
 </body>

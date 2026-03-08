@@ -841,7 +841,7 @@
         <a href="/neural.html" class="nav-link">🧠 Neural</a>
         <a href="/logs.html" class="nav-link">📋 Logs</a>
         <a href="/identity.html" class="nav-link">🧠 Identity</a>
-        <a href="/logout" class="nav-link" style="color: var(--accent-rose, #ef4444);">⏏ Logout</a>
+        <a href="#" onclick="logout(event)" class="nav-link" style="color: var(--accent-rose, #ef4444);">⏏ Logout</a>
       </div>
     </div>
     <div class="header-right">
@@ -1620,6 +1620,10 @@
       document.querySelector('.mobile-overlay').classList.toggle('open');
       var overlay = document.querySelector('.mobile-overlay');
       overlay.style.display = overlay.classList.contains('open') ? 'block' : 'none';
+    }
+    function logout(event) {
+      if (event) event.preventDefault();
+      fetch('/logout', { method: 'POST' }).then(function () { window.location = '/login'; });
     }
   </script>
 </body>

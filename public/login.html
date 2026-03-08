@@ -234,6 +234,7 @@
       <div class="error-msg" id="errorMsg">Invalid credentials. Please try again.</div>
 
       <form method="POST" action="/login">
+        <input type="hidden" id="nextInput" name="next" value="/">
         <div class="form-group">
           <label class="form-label" for="username">Username</label>
           <input class="form-input" type="text" id="username" name="username"
@@ -252,8 +253,13 @@
   </div>
 
   <script>
+    var params = new URLSearchParams(window.location.search);
+    var next = params.get('next');
+    if (next && next.startsWith('/') && !next.startsWith('//')) {
+      document.getElementById('nextInput').value = next;
+    }
     // Show error banner if ?error=1 in URL
-    if (new URLSearchParams(window.location.search).get('error') === '1') {
+    if (params.get('error') === '1') {
       document.getElementById('errorMsg').classList.add('visible');
     }
   </script>

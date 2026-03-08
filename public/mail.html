@@ -690,7 +690,7 @@
       <a href="/logs.html">📋 Logs</a>
       <a href="/identity.html">🧠 Identity</a>
       <a href="/settings.html">⚙️ Settings</a>
-      <a href="/logout" style="color: var(--accent-red, #ef4444);">⏏ Logout</a>
+      <a href="#" onclick="logout(event)" style="color: var(--accent-red, #ef4444);">⏏ Logout</a>
     </div>
     <div class="nav-tabs">
       <div class="nav-tab active" data-folder="INBOX" onclick="switchFolder('INBOX')">
@@ -745,8 +745,10 @@
 
   <script>
     let currentFolder='INBOX';let emailCache={};
+    function logout(event){if(event)event.preventDefault();fetch('/logout',{method:'POST'}).then(function(){window.location='/login';});}
+    function renderMailList(folder,emails){if(!emails||!emails.length)return'<div class="empty-state">No emails in this folder</div>';return emails.map(function(e){var isSent=folder==='Sent';var icon=isSent?'sent':'received';var initial=(isSent?(e.to||'?'):(e.from||'?')).charAt(0).toUpperCase();var person=isSent?(e.to||'Unknown'):(e.from||'Unknown');return'<div class="mail-item" onclick="viewEmail(\''+folder+'\','+e.id+')"><div class="mail-icon '+icon+'">'+initial+'</div><div class="mail-from">'+escapeHtml(person)+'</div><div class="mail-subject">'+escapeHtml(e.subject||'(no subject)')+'</div><div class="mail-date">'+escapeHtml(e.date||'')+'</div></div>'}).join('')}
     async function switchFolder(folder){currentFolder=folder;document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));document.querySelector('[data-folder="'+folder+'"]').classList.add('active');await loadEmails(folder)}
-    async function loadEmails(folder){var list=document.getElementById('mailList'),loading=document.getElementById('loading'),view=document.getElementById('mailView');list.style.display='none';view.classList.remove('active');loading.style.display='block';try{var res=await fetch('/api/mail/list?folder='+encodeURIComponent(folder));var data=await res.json();if(folder==='INBOX')document.getElementById('inbox-count').textContent=data.emails?.length||0;if(folder==='Sent')document.getElementById('sent-count').textContent=data.emails?.length||0;if(!data.emails?.length){list.innerHTML='<div class="empty-state">No emails in this folder</div>'}else{list.innerHTML=data.emails.map(function(e){var isSent=folder==='Sent';var icon=isSent?'sent':'received';var initial=(isSent?(e.to||'?'):(e.from||'?')).charAt(0).toUpperCase();var person=isSent?(e.to||'Unknown'):(e.from||'Unknown');return'<div class="mail-item" onclick="viewEmail(\''+folder+'\','+e.id+')"><div class="mail-icon '+icon+'">'+initial+'</div><div class="mail-from">'+escapeHtml(person)+'</div><div class="mail-subject">'+escapeHtml(e.subject||'(no subject)')+'</div><div class="mail-date">'+(e.date||'')+'</div></div>'}).join('')}loading.style.display='none';list.style.display='block'}catch(err){loading.textContent='Failed: '+err.message}}
+    async function loadEmails(folder){var list=document.getElementById('mailList'),loading=document.getElementById('loading'),view=document.getElementById('mailView');list.style.display='none';view.classList.remove('active');loading.style.display='block';try{var res=await fetch('/api/mail/list?folder='+encodeURIComponent(folder));var data=await res.json();if(folder==='INBOX')document.getElementById('inbox-count').textContent=data.emails?.length||0;if(folder==='Sent')document.getElementById('sent-count').textContent=data.emails?.length||0;emailCache={};list.innerHTML=renderMailList(folder,data.emails||[]);loading.style.display='none';list.style.display='block'}catch(err){loading.textContent='Failed: '+err.message}}
     async function viewEmail(folder,id){var key=folder+':'+id;var list=document.getElementById('mailList'),view=document.getElementById('mailView');list.style.display='none';if(emailCache[key]){renderEmail(emailCache[key]);return}document.getElementById('viewSubject').textContent='Loading...';document.getElementById('viewFrom').textContent='';document.getElementById('viewTo').textContent='';document.getElementById('viewDate').textContent='';document.getElementById('viewBody').textContent='';view.classList.add('active');try{var res=await fetch('/api/mail/read?folder='+encodeURIComponent(folder)+'&id='+id);var data=await res.json();emailCache[key]=data;renderEmail(data)}catch(err){document.getElementById('viewBody').textContent='Error: '+err.message}}
     function renderEmail(data){document.getElementById('viewSubject').textContent=data.subject||'(no subject)';document.getElementById('viewFrom').textContent=data.from||'Unknown';document.getElementById('viewTo').textContent=data.to||'Unknown';document.getElementById('viewDate').textContent=data.date||'';document.getElementById('viewBody').textContent=data.body||'(empty)';document.getElementById('mailView').classList.add('active')}
     function showList(){document.getElementById('mailView').classList.remove('active');document.getElementById('mailList').style.display='block'}
@@ -761,7 +763,7 @@
           if(folder==='INBOX')document.getElementById('inbox-count').textContent=data.emails?.length||0;
           if(folder==='Sent')document.getElementById('sent-count').textContent=data.emails?.length||0;
           if(data.emails?.length){
-            list.innerHTML=data.emails.map(function(e){var isSent=folder==='Sent';var icon=isSent?'sent':'received';var initial=(isSent?(e.to||'?'):(e.from||'?')).charAt(0).toUpperCase();var person=isSent?(e.to||'Unknown'):(e.from||'Unknown');return'<div class="mail-item" onclick="viewEmail(\''+folder+'\','+e.id+')"><div class="mail-icon '+icon+'">'+initial+'</div><div class="mail-from">'+escapeHtml(person)+'</div><div class="mail-subject">'+escapeHtml(e.subject||'(no subject)')+'</div><div class="mail-date">'+(e.date||'')+'</div></div>'}).join('')
+            list.innerHTML=renderMailList(folder,data.emails||[])
           }
         }
       }catch(e){/* silent — stale data remains */}

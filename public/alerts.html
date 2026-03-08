@@ -60,7 +60,7 @@
       <a href="/analytics.html">Analytics</a>
       <a href="/channels.html">Channels</a>
       <a href="/settings.html">Settings</a>
-      <a href="/logout" style="color:var(--red)">Logout</a>
+      <a href="#" onclick="logout(event)" style="color:var(--red)">Logout</a>
     </div>
   </div>
 
@@ -160,6 +160,17 @@ function toggleMobileNav(){
   o.style.display=o.classList.contains('open')?'block':'none';
 }
 
+function logout(event){
+  if (event) event.preventDefault();
+  fetch('/logout', { method:'POST' }).then(function(){ window.location = '/login'; });
+}
+
+function escapeHtml(text){
+  var div=document.createElement('div');
+  div.textContent=text==null?'':String(text);
+  return div.innerHTML;
+}
+
 function saveAlertConfig() {
   var config = {
     budgetLimit: parseFloat(document.getElementById('budgetLimit').value) || 10,
@@ -214,7 +225,23 @@ function loadAlertConfig() {
   }).catch(function(){});
 }
 
+function loadRecentAlerts() {
+  fetch('/api/alerts/recent').then(function(r){return r.json()}).then(function(data) {
+    var log = document.getElementById('alertLog');
+    var items = data.items || [];
+    if (!items.length) {
+      log.innerHTML = '<div style="color:var(--muted);text-align:center;padding:20px;font-size:13px">No active alerts. Thresholds are configured, but nothing is currently firing.</div>';
+      return;
+    }
+    log.innerHTML = items.map(function(item) {
+      return '<div style="padding:12px 0;border-bottom:1px solid rgba(255,255,255,.06)"><div style="font-weight:600;color:' + (item.level === 'error' ? 'var(--red)' : 'var(--amber)') + '">' + escapeHtml(item.title) + '</div><div style="font-size:12px;color:var(--text2);margin-top:4px">' + escapeHtml(item.detail) + '</div><div style="font-size:11px;color:var(--muted);margin-top:4px">' + new Date(item.timestamp).toLocaleString() + '</div></div>';
+    }).join('');
+  }).catch(function(){});
+}
+
 loadAlertConfig();
+loadRecentAlerts();
+setInterval(loadRecentAlerts, 30000);
 </script>
 </body>
 </html>

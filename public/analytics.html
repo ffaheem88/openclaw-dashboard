@@ -45,7 +45,7 @@
       <a href="/agents.html">Agents</a>
       <a href="/files.html">Files</a>
       <a href="/settings.html">Settings</a>
-      <a href="/logout" style="color:var(--red)">Logout</a>
+      <a href="#" onclick="logout(event)" style="color:var(--red)">Logout</a>
     </div>
   </div>
 
@@ -94,6 +94,11 @@ function toggleMobileNav(){
   o.style.display=o.classList.contains('open')?'block':'none';
 }
 
+function logout(event){
+  if (event) event.preventDefault();
+  fetch('/logout', { method:'POST' }).then(function(){ window.location = '/login'; });
+}
+
 Chart.defaults.color = '#94a3b8';
 Chart.defaults.borderColor = 'rgba(255,255,255,0.05)';
 
@@ -114,12 +119,12 @@ function loadAnalytics() {
   fetch('/api/costs/summary').then(function(r){return r.json()}).then(function(data) {
     document.getElementById('costToday').textContent = formatCost(data.totalToday);
     document.getElementById('cost7d').textContent = formatCost(data.totalSevenDays);
-    document.getElementById('totalSessions').textContent = data.sessions || '—';
-    document.getElementById('totalModels').textContent = Object.keys(data.models || {}).length;
+    document.getElementById('totalSessions').textContent = String((data.sessions || []).length);
+    document.getElementById('totalModels').textContent = String(Object.keys(data.modelTotals || {}).length);
 
     // Daily chart
-    var days = Object.keys(data.daily || {}).sort();
-    var dailyVals = days.map(function(d){return data.daily[d]});
+    var days = (data.sevenDayBreakdown || []).map(function(d){ return d.date; });
+    var dailyVals = (data.sevenDayBreakdown || []).map(function(d){ return d.cost || 0; });
     if (dailyChart) dailyChart.destroy();
     dailyChart = new Chart(document.getElementById('dailyChart'), {
       type: 'bar',
@@ -131,7 +136,7 @@ function loadAnalytics() {
     });
 
     // Model donut
-    var models = data.models || {};
+    var models = data.modelTotals || {};
     var mNames = Object.keys(models);
     var mCosts = mNames.map(function(m){return models[m].cost || 0});
     var colors = ['#06b6d4','#8b5cf6','#ec4899','#10b981','#f59e0b','#3b82f6','#f43f5e','#a78bfa'];
@@ -178,7 +183,7 @@ function loadAnalytics() {
     var counts = [];
     for (var h = 0; h < 24; h++) {
       hours.push(h + ':00');
-      counts.push(data[h] || 0);
+      counts.push((data.hourBuckets || [])[h] || 0);
     }
     if (hourlyChart) hourlyChart.destroy();
     hourlyChart = new Chart(document.getElementById('hourlyChart'), {

@@ -148,17 +148,39 @@ function startServer() {
 function checkStatus() {
   const http = require('http');
   const port = process.env.PORT || 3000;
-  const req = http.get('http://localhost:' + port + '/api/health', (res) => {
+  const req = http.get('http://localhost:' + port + '/login', (res) => {
     let data = '';
     res.on('data', (d) => data += d);
     res.on('end', () => {
-      try {
-        const j = JSON.parse(data);
-        console.log('✅ Dashboard running on port', port);
-        console.log('   Uptime:', j.uptime || 'unknown');
-      } catch {
-        console.log('✅ Dashboard responding on port', port);
+      const setupIncomplete = res.statusCode === 302 && /\/setup/.test(String(res.headers.location || ''));
+      const loginReachable = res.statusCode === 200 || (res.statusCode >= 300 && res.statusCode < 400);
+      if (!loginReachable) {
+        console.log('❌ Dashboard not running on port', port);
+        return;
       }
+      console.log('✅ Dashboard running on port', port);
+      if (setupIncomplete) {
+        console.log('   Status: setup required');
+        return;
+      }
+
+      const healthReq = http.get('http://localhost:' + port + '/api/health', (healthRes) => {
+        let healthData = '';
+        healthRes.on('data', (d) => healthData += d);
+        healthRes.on('end', () => {
+          try {
+            const j = JSON.parse(healthData);
+            console.log('   Uptime:', j.system && j.system.uptime != null ? j.system.uptime : 'unknown');
+          } catch {
+            console.log('   Uptime: unknown (auth required)');
+          }
+        });
+      });
+      healthReq.on('error', () => console.log('   Uptime: unknown'));
+      healthReq.setTimeout(3000, () => {
+        console.log('   Uptime: unknown');
+        healthReq.destroy();
+      });
     });
   });
   req.on('error', () => {

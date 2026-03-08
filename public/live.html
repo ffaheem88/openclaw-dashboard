@@ -70,7 +70,7 @@
       <a href="/files.html">Files</a>
       <a href="/crons.html">Crons</a>
       <a href="/settings.html">Settings</a>
-      <a href="/logout" style="color:var(--red)">Logout</a>
+      <a href="#" onclick="logout(event)" style="color:var(--red)">Logout</a>
     </div>
   </div>
 
@@ -116,11 +116,20 @@ var autoScroll = true;
 var pollInterval = null;
 var lastMsgCount = 0;
 
+function jsString(value) {
+  return JSON.stringify(String(value == null ? '' : value));
+}
+
 function toggleMobileNav(){
   document.querySelector('.nav').classList.toggle('open');
   var o=document.querySelector('.mobile-overlay');
   o.classList.toggle('open');
   o.style.display=o.classList.contains('open')?'block':'none';
+}
+
+function logout(event){
+  if (event) event.preventDefault();
+  fetch('/logout', { method:'POST' }).then(function(){ window.location = '/login'; });
 }
 
 function formatAge(ts) {
@@ -162,10 +171,10 @@ function loadSessions() {
       var active = currentSession === s.key ? ' active' : '';
       var label = s.key.replace('agent:voice:','').replace('whatsapp:','📱 ').replace('telegram:','✈️ ').replace('discord:','🎮 ');
       if (label.length > 35) label = label.substring(0,35) + '…';
-      html += '<div class="sess-item' + active + '" onclick="selectSession(\'' + s.key + '\')">' +
+      html += '<div class="sess-item' + active + '" onclick=\'selectSession(' + jsString(s.key) + ')\'>' +
         '<div class="sess-label">' + getStatusDot(s.updatedAt) + ' ' + escapeHtml(label) + '</div>' +
         '<div class="sess-meta"><span>' + formatAge(s.updatedAt) + '</span>' +
-        (s.chatType ? '<span>' + s.chatType + '</span>' : '') +
+        (s.chatType ? '<span>' + escapeHtml(s.chatType) + '</span>' : '') +
         '</div></div>';
     });
     items.innerHTML = html;
@@ -258,8 +267,26 @@ document.getElementById('messages').addEventListener('scroll', function() {
   if (autoScroll) document.getElementById('scrollBadge').style.display = 'none';
 });
 
+document.addEventListener('visibilitychange', function() {
+  if (document.hidden && pollInterval) {
+    clearInterval(pollInterval);
+    pollInterval = null;
+  } else if (!document.hidden && currentSession && !pollInterval) {
+    refreshSession();
+    pollInterval = setInterval(refreshSession, 5000);
+  }
+});
+
+window.addEventListener('beforeunload', function() {
+  if (pollInterval) clearInterval(pollInterval);
+});
+
 loadSessions();
 setInterval(loadSessions, 10000);
+var initialSession = new URLSearchParams(window.location.search).get('session');
+if (initialSession) {
+  setTimeout(function(){ selectSession(initialSession); }, 100);
+}
 </script>
 </body>
 </html>

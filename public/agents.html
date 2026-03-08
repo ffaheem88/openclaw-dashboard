@@ -940,7 +940,7 @@
             <a href="neural.html">🧠 Neural</a>
             <a href="/logs.html">📋 Logs</a>
             <a href="/identity.html">🧠 Identity</a>
-            <a href="/logout" style="color: var(--accent-red, #ef4444);">⏏ Logout</a>
+            <a href="#" onclick="logout(event)" style="color: var(--accent-red, #ef4444);">⏏ Logout</a>
         </div>
     </div>
 
@@ -1119,6 +1119,15 @@
             return d.innerHTML;
         }
 
+        function jsString(value) {
+            return JSON.stringify(String(value == null ? '' : value));
+        }
+
+        function logout(event) {
+            if (event) event.preventDefault();
+            fetch('/logout', { method: 'POST' }).then(function () { window.location = '/login'; });
+        }
+
         var allSessions = [];
 
         var feedLastUpdated = null;
@@ -1214,7 +1223,7 @@
                     s.status === 'active' ? '<span class="badge badge-running">🔄 running</span>' :
                     '<span class="badge badge-ok">✅ ok</span>';
                 var rowStyle = s.hasError ? ' style="background: rgba(239, 68, 68, 0.06);"' : '';
-                return '<tr onclick="openDetail(\'' + s.id + '\')"' + rowStyle + '>' +
+                return '<tr onclick=\'openDetail(' + jsString(s.id) + ')\' ' + rowStyle + '>' +
                     '<td>' + kindBadge(s.kind) + '</td>' +
                     '<td>' +
                     '<div class="session-task" title="' + escapeHtml(s.task) + '">' + escapeHtml(s.task.substring(0, 80)) + '</div>' +
@@ -1233,7 +1242,7 @@
                     '</div>' +
                     '</td>' +
                     '<td style="font-size: 12px; font-weight: 500; color:' + (s.cost > 0 ? 'var(--accent-amber)' : 'var(--text-secondary)') + ';">' + (s.cost > 0 ? '$' + s.cost.toFixed(4) : '$0') + '</td>' +
-                    '<td>' + (s.sessionKey && s.sessionKey !== 'agent:main:main' && s.kind !== 'main' ? '<button onclick="killSession(\'' + escapeHtml(s.sessionKey) + '\', event)" style="background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); color: #ef4444; padding: 2px 8px; border-radius: 6px; cursor: pointer; font-size: 11px; white-space: nowrap;">🛑 Kill</button>' : '') + '</td>' +
+                    '<td>' + (s.sessionKey && s.sessionKey !== 'agent:main:main' && s.kind !== 'main' ? '<button onclick=\'killSession(' + jsString(s.sessionKey) + ', event)\' style="background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); color: #ef4444; padding: 2px 8px; border-radius: 6px; cursor: pointer; font-size: 11px; white-space: nowrap;">🛑 Kill</button>' : '') + '</td>' +
                     '</tr>';
             }).join('');
         }
@@ -1332,10 +1341,10 @@
                         })() + '</div>' +
                         (j.lastErrorMessage ? '<div class="cron-error-section"><details><summary class="cron-error-summary">⚠️ Last Error' + (j.lastErrorTime ? ' (' + formatTime(j.lastErrorTime) + ')' : '') + '</summary><div class="cron-error-body">' + escapeHtml(j.lastErrorMessage).substring(0, 300) + '</div></details></div>' : '') +
                         '<div class="cron-controls">' +
-                        '<div class="toggle-switch ' + (j.enabled ? 'active' : '') + '" onclick="toggleCron(\'' + j.id + '\', ' + !j.enabled + ', this)">' +
+                        '<div class="toggle-switch ' + (j.enabled ? 'active' : '') + '" onclick=\'toggleCron(' + jsString(j.id) + ', ' + !j.enabled + ', this)\'>' +
                         '<div class="toggle-slider"></div>' +
                         '</div>' +
-                        '<button class="run-btn" onclick="runCronNow(\'' + j.id + '\', \'' + escapeHtml(j.name || j.id) + '\', this)">' +
+                        '<button class="run-btn" onclick=\'runCronNow(' + jsString(j.id) + ', ' + jsString(j.name || j.id) + ', this)\'>' +
                         '<span>▶</span> Run Now' +
                         '</button>' +
                         '</div>' +
@@ -1356,7 +1365,7 @@
             renderFilteredSessions();
           } catch(e) {
             console.error('[loadAll] failed:', e);
-            document.getElementById('sessionTable').innerHTML = '<tr><td colspan="11" style="text-align:center;padding:40px;color:var(--accent-rose,#f43f5e);">⚠️ Failed to load session data: ' + e.message + '</td></tr>';
+            document.getElementById('sessionTable').innerHTML = '<tr><td colspan="11" style="text-align:center;padding:40px;color:var(--accent-rose,#f43f5e);">⚠️ Failed to load session data: ' + escapeHtml(e.message) + '</td></tr>';
           }
         }
 
@@ -1374,7 +1383,7 @@
                 var data = await res.json();
 
                 if (data.error) {
-                    document.getElementById('detailBody').innerHTML = '<div style="color: #ef4444; padding: 20px;">' + data.error + '</div>';
+                    document.getElementById('detailBody').innerHTML = '<div style="color: #ef4444; padding: 20px;">' + escapeHtml(data.error) + '</div>';
                     return;
                 }
 
@@ -1398,7 +1407,7 @@
                         '</div>';
                 }).join('');
             } catch (e) {
-                document.getElementById('detailBody').innerHTML = '<div style="color: #ef4444; padding: 20px;">Error: ' + e.message + '</div>';
+                document.getElementById('detailBody').innerHTML = '<div style="color: #ef4444; padding: 20px;">Error: ' + escapeHtml(e.message) + '</div>';
             }
         }
 
@@ -1495,7 +1504,7 @@
                         '<span>📡 ' + provider + '</span>' +
                         (s.tokens ? '<span>🔤 ' + s.tokens + '</span>' : '') +
                         '</div>' +
-                        (s.kind !== 'main' && s.status === 'active' ? '<div style="margin-top: 8px; text-align: right;"><button onclick="killSession(\'' + escapeHtml(s.key) + '\', event)" style="background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); color: #ef4444; padding: 4px 12px; border-radius: 8px; cursor: pointer; font-size: 12px; font-weight: 500;">🛑 Kill</button></div>' : '') +
+                        (s.kind !== 'main' && s.status === 'active' ? '<div style="margin-top: 8px; text-align: right;"><button onclick=\'killSession(' + jsString(s.key) + ', event)\' style="background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); color: #ef4444; padding: 4px 12px; border-radius: 8px; cursor: pointer; font-size: 12px; font-weight: 500;">🛑 Kill</button></div>' : '') +
                         '</div>';
                 }).join('') + '</div>';
             } catch (e) {

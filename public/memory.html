@@ -73,13 +73,13 @@
       <a href="/neural.html">Neural</a>
       <a href="/files.html">Files</a>
       <a href="/settings.html">Settings</a>
-      <a href="/logout" style="color:var(--red)">Logout</a>
+      <a href="#" onclick="logout(event)" style="color:var(--red)">Logout</a>
     </div>
   </div>
 
   <div class="content">
     <div class="search-bar">
-      <input type="text" id="searchInput" placeholder="🔍 Search memories semantically..." onkeydown="if(event.key==='Enter')searchMemory()">
+      <input type="text" id="searchInput" placeholder="🔍 Search memory files..." onkeydown="if(event.key==='Enter')searchMemory()">
       <button class="btn btn-cyan" onclick="searchMemory()">Search</button>
     </div>
 
@@ -119,10 +119,19 @@
 <script>
 var currentEditPath = null;
 
+function jsString(value) {
+  return JSON.stringify(String(value == null ? '' : value));
+}
+
 function toggleMobileNav(){
   document.querySelector('.nav').classList.toggle('open');
   var o=document.querySelector('.mobile-overlay');o.classList.toggle('open');
   o.style.display=o.classList.contains('open')?'block':'none';
+}
+
+function logout(event){
+  if (event) event.preventDefault();
+  fetch('/logout', { method:'POST' }).then(function(){ window.location = '/login'; });
 }
 
 function toast(msg, type) {
@@ -158,11 +167,11 @@ function searchMemory() {
     var html = '';
     data.results.forEach(function(r) {
       html += '<div class="memory-card">' +
-        '<div class="memory-header"><span class="memory-path">' + r.file + ':' + r.line + '</span></div>' +
+        '<div class="memory-header"><span class="memory-path">' + escapeHtml(r.file) + ':' + r.line + '</span></div>' +
         '<div class="memory-content">' + escapeHtml(r.text || '') + '</div>' +
         '<div class="memory-footer">' +
-        '<button class="btn btn-cyan" onclick="editFile(\'' + r.file + '\')">✏️ Edit</button>' +
-        '<button class="btn btn-cyan" onclick="window.location.href=\'/files.html?open=' + encodeURIComponent(r.file) + '\'">📄 Open</button>' +
+        '<button class="btn btn-cyan" onclick=\'editFile(' + jsString(r.file) + ')\'>✏️ Edit</button>' +
+        '<button class="btn btn-cyan" onclick=\'window.location.href=' + jsString('/files.html?open=' + encodeURIComponent(r.file)) + '\'>📄 Open</button>' +
         '</div></div>';
     });
     results.innerHTML = html;
@@ -182,9 +191,9 @@ function loadMemoryFiles() {
     var html = '<div class="file-list">';
     memFiles.forEach(function(f) {
       var icon = f.name === 'MEMORY.md' ? '🧠' : f.name === 'SOUL.md' ? '👻' : f.name === 'USER.md' ? '👤' : '📝';
-      html += '<div class="file-card" onclick="editFile(\'' + f.path + '\')">' +
-        '<div class="name">' + icon + ' ' + f.name + '</div>' +
-        '<div class="info">' + f.path + ' · ' + formatSize(f.size) + '</div></div>';
+      html += '<div class="file-card" onclick=\'editFile(' + jsString(f.path) + ')\'>' +
+        '<div class="name">' + icon + ' ' + escapeHtml(f.name) + '</div>' +
+        '<div class="info">' + escapeHtml(f.path) + ' · ' + formatSize(f.size) + '</div></div>';
     });
     html += '</div>';
     container.innerHTML = html;

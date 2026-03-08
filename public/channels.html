@@ -53,7 +53,7 @@
       <a href="/live.html">Live</a>
       <a href="/analytics.html">Analytics</a>
       <a href="/settings.html">Settings</a>
-      <a href="/logout" style="color:var(--red)">Logout</a>
+      <a href="#" onclick="logout(event)" style="color:var(--red)">Logout</a>
     </div>
   </div>
 
@@ -89,6 +89,17 @@ function toggleMobileNav(){
   o.style.display=o.classList.contains('open')?'block':'none';
 }
 
+function escapeHtml(text) {
+  var div = document.createElement('div');
+  div.textContent = text == null ? '' : String(text);
+  return div.innerHTML;
+}
+
+function logout(event){
+  if (event) event.preventDefault();
+  fetch('/logout', { method:'POST' }).then(function(){ window.location = '/login'; });
+}
+
 function dotClass(state) {
   if (state === 'active' || state === 'running' || state === 'connected' || state === 'ok') return 'dot-active';
   if (state === 'inactive' || state === 'failed' || state === 'error' || state === 'disconnected') return 'dot-inactive';
@@ -117,11 +128,11 @@ function loadChannels() {
       var isRecent = c.lastActive && (Date.now() - new Date(c.lastActive).getTime() < 600000);
       html += '<div class="status-card">' +
         '<div class="card-header"><div class="name"><span class="status-dot ' + (isRecent?'dot-active':'dot-warning') + '"></span>' +
-        (icons[ch]||'📡') + ' ' + ch.charAt(0).toUpperCase()+ch.slice(1) + '</div></div>' +
+        (icons[ch]||'📡') + ' ' + escapeHtml(ch.charAt(0).toUpperCase()+ch.slice(1)) + '</div></div>' +
         '<div class="card-detail">' +
         '<div class="row"><span class="lbl">Sessions</span><span>' + c.count + '</span></div>' +
         '<div class="row"><span class="lbl">Last active</span><span>' + age + '</span></div>' +
-        '<div class="row"><span class="lbl">Types</span><span>' + Array.from(c.chatTypes).join(', ') + '</span></div>' +
+        '<div class="row"><span class="lbl">Types</span><span>' + escapeHtml(Array.from(c.chatTypes).join(', ')) + '</span></div>' +
         '</div></div>';
     });
     if (!html) html = '<div class="status-card"><div style="color:var(--muted)">No channels detected</div></div>';
@@ -148,18 +159,23 @@ function loadServices() {
 
 function loadProviders() {
   fetch('/api/health/providers').then(function(r){return r.json()}).then(function(data) {
-    var providers = data.providers || [];
+    var providers = Object.keys(data || {}).filter(function(k){ return k !== 'checkedAt'; }).map(function(name) {
+      var info = data[name] || {};
+      info.name = name;
+      return info;
+    });
     var html = '';
     var icons = {anthropic:'🤖',openai:'🟢',openrouter:'🔀',ollama:'🦙',google:'🔵'};
     providers.forEach(function(p) {
       var name = p.name || p.provider || 'Unknown';
       var icon = icons[name.toLowerCase()] || '🧠';
       var ok = p.status === 'ok' || p.healthy;
+      var detail = p.error || (p.models != null ? (p.models + ' models') : (p.balance ? 'authenticated' : ''));
       html += '<div class="provider-card">' +
         '<div class="icon">' + icon + '</div>' +
-        '<div class="info"><div class="name">' + name + '</div>' +
-        '<div class="detail">' + (p.model || p.details || '') + '</div></div>' +
-        '<div class="status ' + (ok?'status-ok':'status-error') + '">' + (ok?'✓ OK':'✗ Error') + '</div></div>';
+        '<div class="info"><div class="name">' + escapeHtml(name) + '</div>' +
+        '<div class="detail">' + escapeHtml(detail) + '</div></div>' +
+        '<div class="status ' + (ok?'status-ok':'status-error') + '">' + escapeHtml(p.status || (ok?'ok':'error')) + '</div></div>';
     });
     if (!html) html = '<div class="status-card"><div style="color:var(--muted)">No providers detected</div></div>';
     document.getElementById('providerCards').innerHTML = html;
@@ -170,12 +186,17 @@ function loadNetwork() {
   fetch('/api/network/status').then(function(r){return r.json()}).then(function(data) {
     var html = '';
     if (data.tunnel) {
-      html += '<div class="status-card"><div class="card-header"><div class="name"><span class="status-dot ' + dotClass(data.tunnel.status) + '"></span>🌐 Cloudflare Tunnel</div></div>' +
-        '<div class="card-detail"><div class="row"><span class="lbl">Status</span><span>' + (data.tunnel.status || 'unknown') + '</span></div></div></div>';
+      html += '<div class="status-card"><div class="card-header"><div class="name"><span class="status-dot ' + dotClass(data.tunnel.active) + '"></span>🌐 Cloudflare Tunnel</div></div>' +
+        '<div class="card-detail"><div class="row"><span class="lbl">Status</span><span>' + escapeHtml(data.tunnel.active || 'unknown') + '</span></div>' +
+        '<div class="row"><span class="lbl">Tunnel ID</span><span>' + escapeHtml(data.tunnelId || 'not configured') + '</span></div></div></div>';
     }
-    if (data.dns) {
-      html += '<div class="status-card"><div class="card-header"><div class="name"><span class="status-dot dot-active"></span>🔗 DNS</div></div>' +
-        '<div class="card-detail"><div class="row"><span class="lbl">Resolver</span><span>' + (data.dns || '-') + '</span></div></div></div>';
+    if (data.arc) {
+      html += '<div class="status-card"><div class="card-header"><div class="name"><span class="status-dot ' + dotClass(data.arc.httpStatus >= 200 && data.arc.httpStatus < 400 ? 'ok' : 'error') + '"></span>🔗 ARC URL</div></div>' +
+        '<div class="card-detail"><div class="row"><span class="lbl">Status</span><span>' + escapeHtml((data.arc.httpStatus || 0) ? ('HTTP ' + data.arc.httpStatus) : 'not configured') + '</span></div></div></div>';
+    }
+    if (data.dashboard) {
+      html += '<div class="status-card"><div class="card-header"><div class="name"><span class="status-dot ' + dotClass(data.dashboard.httpStatus >= 200 && data.dashboard.httpStatus < 400 ? 'ok' : 'error') + '"></span>📊 Dashboard URL</div></div>' +
+        '<div class="card-detail"><div class="row"><span class="lbl">Status</span><span>' + escapeHtml((data.dashboard.httpStatus || 0) ? ('HTTP ' + data.dashboard.httpStatus) : 'not configured') + '</span></div></div></div>';
     }
     if (!html) html = '<div class="status-card"><div style="color:var(--muted)">Network info unavailable</div></div>';
     document.getElementById('networkCards').innerHTML = html;

@@ -494,7 +494,7 @@
   <a class="hud-btn hud-nav" href="settings.html" title="Settings">⚙️</a>
   <a class="hud-btn hud-nav" href="logs.html" title="Logs">📋</a>
   <a class="hud-btn hud-nav" href="identity.html" title="Identity">🧠</a>
-  <a class="hud-btn hud-nav" href="/logout" title="Logout" style="color: var(--accent-red, #ef4444);">⏏</a>
+  <a class="hud-btn hud-nav" href="#" onclick="logout(event)" title="Logout" style="color: var(--accent-red, #ef4444);">⏏</a>
 </div>
 
 <!-- Row 2: stats -->
@@ -1196,6 +1196,17 @@
     );
   }
 
+  function escapeHtml(text) {
+    var div = document.createElement('div');
+    div.textContent = text == null ? '' : String(text);
+    return div.innerHTML;
+  }
+
+  function logout(event) {
+    if (event) event.preventDefault();
+    fetch('/logout', { method: 'POST' }).then(function () { window.location = '/login'; });
+  }
+
 
   // ── Detail panel ───────────────────────────────────────────────────────────
   function openDetailPanel(node) {
@@ -1209,7 +1220,11 @@
     labelEl.className = 'dp-label ' + (node.type || 'concept');
 
     var badgeWrap = document.getElementById('dp-badge-wrap');
-    badgeWrap.innerHTML = '<span class="type-badge ' + (node.type||'concept') + '">' + (node.type||'concept').toUpperCase() + '</span>';
+    badgeWrap.innerHTML = '';
+    var badge = document.createElement('span');
+    badge.className = 'type-badge ' + (node.type || 'concept');
+    badge.textContent = (node.type || 'concept').toUpperCase();
+    badgeWrap.appendChild(badge);
 
     // Stats
     var statsEl = document.getElementById('dp-stats-content');
@@ -1236,7 +1251,13 @@
     var tagsEl = document.getElementById('dp-tags');
     if (node.tags && node.tags.length) {
       tagsSection.style.display = 'flex';
-      tagsEl.innerHTML = node.tags.map(function(t) { return '<span class="tag-chip">' + t + '</span>'; }).join('');
+      tagsEl.innerHTML = '';
+      node.tags.forEach(function(tag) {
+        var chip = document.createElement('span');
+        chip.className = 'tag-chip';
+        chip.textContent = tag;
+        tagsEl.appendChild(chip);
+      });
     } else {
       tagsSection.style.display = 'none';
     }
@@ -1261,13 +1282,20 @@
     document.getElementById('dp-conn-count').textContent = '(' + uniqueConn.length + ')';
     var connEl = document.getElementById('dp-connections');
     if (uniqueConn.length) {
-      connEl.innerHTML = uniqueConn.slice(0, 20).map(function(c) {
+      connEl.innerHTML = '';
+      uniqueConn.slice(0, 20).forEach(function(c) {
         var n2 = nodeById[c.id];
         var lbl = n2 ? (n2.label || n2.id) : c.id;
-        return '<div class="conn-item" data-nodeid="' + c.id + '">' +
-          '<span class="ci-type">' + (c.edgeType || '').replace('_', ' ') + '</span>' +
-          lbl + '</div>';
-      }).join('');
+        var item = document.createElement('div');
+        item.className = 'conn-item';
+        item.setAttribute('data-nodeid', c.id);
+        var type = document.createElement('span');
+        type.className = 'ci-type';
+        type.textContent = (c.edgeType || '').replace('_', ' ');
+        item.appendChild(type);
+        item.appendChild(document.createTextNode(lbl));
+        connEl.appendChild(item);
+      });
       connEl.querySelectorAll('.conn-item').forEach(function(el) {
         el.addEventListener('click', function() {
           var nid = el.getAttribute('data-nodeid');
@@ -1529,15 +1557,19 @@
       return;
     }
     var maxFreq = Math.max.apply(null, concepts.map(function(c) { return c.freq || 0; })) || 1;
-    hcpBody.innerHTML = concepts.map(function(c, i) {
+    hcpBody.innerHTML = '';
+    concepts.forEach(function(c, i) {
       var pct = Math.max(8, Math.round(((c.freq || 0) / maxFreq) * 100));
-      var label = (c.label || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-      return '<div class="hcp-chip" data-label="' + c.label.replace(/"/g,'&quot;') + '" title="' + label + ' (freq: ' + c.freq + ')">' +
-        '<span class="hcp-rank">' + (i + 1) + '</span>' +
-        '<span class="hcp-label">' + label + '</span>' +
-        '<div class="hcp-bar-wrap"><div class="hcp-bar" style="width:' + pct + '%"></div></div>' +
-        '</div>';
-    }).join('');
+      var chip = document.createElement('div');
+      chip.className = 'hcp-chip';
+      chip.setAttribute('data-label', c.label || '');
+      chip.title = (c.label || '') + ' (freq: ' + c.freq + ')';
+      chip.innerHTML = '<span class="hcp-rank"></span><span class="hcp-label"></span><div class="hcp-bar-wrap"><div class="hcp-bar"></div></div>';
+      chip.querySelector('.hcp-rank').textContent = i + 1;
+      chip.querySelector('.hcp-label').textContent = c.label || '';
+      chip.querySelector('.hcp-bar').style.width = pct + '%';
+      hcpBody.appendChild(chip);
+    });
 
     // Bind click → search highlight
     hcpBody.querySelectorAll('.hcp-chip').forEach(function(chip) {

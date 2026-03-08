@@ -68,7 +68,7 @@
       <a href="/analytics.html">Analytics</a>
       <a href="/channels.html">Channels</a>
       <a href="/settings.html">Settings</a>
-      <a href="/logout" style="color:var(--red)">Logout</a>
+      <a href="#" onclick="logout(event)" style="color:var(--red)">Logout</a>
     </div>
   </div>
 
@@ -111,6 +111,21 @@ function toggleMobileNav(){
   o.style.display=o.classList.contains('open')?'block':'none';
 }
 
+function escapeHtml(text) {
+  var div = document.createElement('div');
+  div.textContent = text == null ? '' : String(text);
+  return div.innerHTML;
+}
+
+function jsString(value) {
+  return JSON.stringify(String(value == null ? '' : value));
+}
+
+function logout(event){
+  if (event) event.preventDefault();
+  fetch('/logout', { method:'POST' }).then(function(){ window.location = '/login'; });
+}
+
 function toast(msg, type) {
   var t = document.getElementById('toast');
   t.textContent = msg;
@@ -149,17 +164,17 @@ function loadAgents() {
       var label = s.key.replace('agent:voice:','');
       if (label.length > 40) label = label.substring(0,40) + '…';
       html += '<div class="agent-card">' +
-        '<div class="agent-header"><div class="agent-name">🤖 ' + label + '</div>' +
-        '<span class="agent-status ' + st.cls + '">' + st.text + '</span></div>' +
+        '<div class="agent-header"><div class="agent-name">🤖 ' + escapeHtml(label) + '</div>' +
+        '<span class="agent-status ' + st.cls + '">' + escapeHtml(st.text) + '</span></div>' +
         '<div class="agent-details">' +
-        '<div class="row"><span class="lbl">Session ID</span><span>' + (s.sessionId||'-').substring(0,8) + '…</span></div>' +
-        '<div class="row"><span class="lbl">Channel</span><span>' + (s.origin||'unknown') + '</span></div>' +
-        '<div class="row"><span class="lbl">Type</span><span>' + (s.chatType||'-') + '</span></div>' +
+        '<div class="row"><span class="lbl">Session ID</span><span>' + escapeHtml((s.sessionId||'-').substring(0,8) + '…') + '</span></div>' +
+        '<div class="row"><span class="lbl">Channel</span><span>' + escapeHtml(s.origin||'unknown') + '</span></div>' +
+        '<div class="row"><span class="lbl">Type</span><span>' + escapeHtml(s.chatType||'-') + '</span></div>' +
         '<div class="row"><span class="lbl">Last active</span><span>' + formatAge(s.updatedAt) + '</span></div>' +
         '</div>' +
         '<div class="agent-actions">' +
-        '<button class="btn btn-cyan" onclick="viewLive(\'' + s.key + '\')">👁️ View</button>' +
-        '<button class="btn btn-green" onclick="openSteer(\'' + s.key + '\')">📡 Steer</button>' +
+        '<button class="btn btn-cyan" onclick=\'viewLive(' + jsString(s.key) + ')\'>👁️ View</button>' +
+        '<button class="btn btn-green" onclick=\'openSteer(' + jsString(s.key) + ')\'>📡 Steer</button>' +
         '</div></div>';
     });
     grid.innerHTML = html;
@@ -170,8 +185,8 @@ function loadAgents() {
     sessions.forEach(function(s) {
       var label = s.key.replace('agent:voice:','');
       var st = getStatus(s.updatedAt);
-      treeHtml += '<div class="tree-node"><span class="node-label">' + label + '</span>' +
-        '<span class="node-meta">' + st.text + ' · ' + formatAge(s.updatedAt) + '</span></div>';
+      treeHtml += '<div class="tree-node"><span class="node-label">' + escapeHtml(label) + '</span>' +
+        '<span class="node-meta">' + escapeHtml(st.text) + ' · ' + formatAge(s.updatedAt) + '</span></div>';
     });
     tree.innerHTML = treeHtml || '<div class="empty">No sessions</div>';
   });

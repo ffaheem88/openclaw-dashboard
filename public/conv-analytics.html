@@ -48,7 +48,7 @@
       <a href="/live.html">Live</a>
       <a href="/analytics.html">Cost Analytics</a>
       <a href="/settings.html">Settings</a>
-      <a href="/logout" style="color:var(--red)">Logout</a>
+      <a href="#" onclick="logout(event)" style="color:var(--red)">Logout</a>
     </div>
   </div>
 
@@ -91,11 +91,18 @@
 <script>
 Chart.defaults.color = '#94a3b8';
 Chart.defaults.borderColor = 'rgba(255,255,255,0.05)';
+var channelChart = null;
+var typeChart = null;
 
 function toggleMobileNav(){
   document.querySelector('.nav').classList.toggle('open');
   var o=document.querySelector('.mobile-overlay');o.classList.toggle('open');
   o.style.display=o.classList.contains('open')?'block':'none';
+}
+
+function logout(event){
+  if (event) event.preventDefault();
+  fetch('/logout', { method:'POST' }).then(function(){ window.location = '/login'; });
 }
 
 function formatAge(ts) {
@@ -135,7 +142,8 @@ function loadAnalytics() {
     var colors = ['#06b6d4','#8b5cf6','#ec4899','#10b981','#f59e0b','#3b82f6'];
     var icons = {whatsapp:'📱',telegram:'✈️',discord:'🎮',signal:'🔐',slack:'💼'};
 
-    new Chart(document.getElementById('channelChart'), {
+    if (channelChart) channelChart.destroy();
+    channelChart = new Chart(document.getElementById('channelChart'), {
       type: 'doughnut',
       data: {
         labels: chNames.map(function(c){return (icons[c]||'📡')+' '+c}),
@@ -145,7 +153,8 @@ function loadAnalytics() {
     });
 
     // Type chart
-    new Chart(document.getElementById('typeChart'), {
+    if (typeChart) typeChart.destroy();
+    typeChart = new Chart(document.getElementById('typeChart'), {
       type: 'bar',
       data: {
         labels: chNames,
@@ -170,10 +179,11 @@ function loadAnalytics() {
   fetch('/api/sessions/hourly').then(function(r){return r.json()}).then(function(data) {
     var heatmap = document.getElementById('heatmap');
     var labels = document.getElementById('heatmapLabels');
-    var max = Math.max.apply(null, Object.values(data).concat([1]));
+    var buckets = data.hourBuckets || [];
+    var max = Math.max.apply(null, buckets.concat([1]));
     var html = '', lblHtml = '';
     for (var h = 0; h < 24; h++) {
-      var val = data[h] || 0;
+      var val = buckets[h] || 0;
       var intensity = val / max;
       var color = intensity > 0.7 ? '#06b6d4' : intensity > 0.3 ? '#8b5cf6' : intensity > 0 ? 'rgba(139,92,246,0.3)' : 'rgba(255,255,255,0.03)';
       html += '<div class="heatmap-cell" style="background:'+color+'" data-label="'+h+':00 — '+val+' msgs"></div>';

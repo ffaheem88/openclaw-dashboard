@@ -1,11 +1,13 @@
 // Load .env from user config dir first, then fallback to package dir
+const dotenv = require('dotenv');
 const _userEnv = require('path').join(process.env.OPENCLAW_HOME || require('path').join(require('os').homedir(), '.openclaw'), 'dashboard', 'config', '.env');
-require('dotenv').config({ path: require('fs').existsSync(_userEnv) ? _userEnv : undefined });
+dotenv.config({ path: require('fs').existsSync(_userEnv) ? _userEnv : undefined });
 const express = require('express');
-const { execSync, spawn } = require('child_process');
+const { execSync, execFileSync, spawnSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const crypto = require('crypto');
 const Database = require('better-sqlite3');
 const session = require('express-session');
 const bcrypt = require('bcryptjs');
@@ -33,19 +35,83 @@ function pushMetricsSample(cpuLoad, memPct) {
 }
 
 const app = express();
-const PORT = 3000;
-const WORKSPACE = process.env.OPENCLAW_WORKSPACE || path.resolve(os.homedir(), '.openclaw/workspace');
-const OPENCLAW_HOME = process.env.OPENCLAW_HOME || path.resolve(os.homedir(), '.openclaw');
-const AGENT_NAME = process.env.OPENCLAW_AGENT || 'voice';
-const SVC_DASHBOARD = process.env.SVC_DASHBOARD || 'clawdbot-dashboard';
-const SVC_TUNNEL = process.env.SVC_TUNNEL || 'cloudflared-dashboard';
-const SVC_EXTRA = (process.env.SVC_EXTRA || 'searxng,ollama').split(',').map(s => s.trim()).filter(Boolean);
-const SESSIONS_DIR = path.join(OPENCLAW_HOME, 'agents', AGENT_NAME, 'sessions');
+const DEFAULT_OPENCLAW_HOME = path.resolve(os.homedir(), '.openclaw');
+const DEFAULT_WORKSPACE = path.join(DEFAULT_OPENCLAW_HOME, 'workspace');
 const NEURAL_DB_PATH = require('path').resolve(require('os').homedir(), '.neuralmemory/brains/default.db');
 
+function getOpenClawHome() {
+  return process.env.OPENCLAW_HOME || DEFAULT_OPENCLAW_HOME;
+}
+
+function getWorkspace() {
+  return process.env.OPENCLAW_WORKSPACE || DEFAULT_WORKSPACE;
+}
+
+function getAgentName() {
+  return process.env.OPENCLAW_AGENT || 'voice';
+}
+
+function getSessionsDir() {
+  return path.join(getOpenClawHome(), 'agents', getAgentName(), 'sessions');
+}
+
+function getDashboardPort() {
+  const value = parseInt(process.env.PORT || '3000', 10);
+  return Number.isInteger(value) && value >= 1 && value <= 65535 ? value : 3000;
+}
+
+function getDashboardHost() {
+  const host = String(process.env.HOST || '0.0.0.0').trim();
+  return /^[a-zA-Z0-9.:_-]+$/.test(host) ? host : '0.0.0.0';
+}
+
+function getServiceName(kind) {
+  if (kind === 'dashboard') return process.env.SVC_DASHBOARD || 'clawdbot-dashboard';
+  if (kind === 'tunnel') return process.env.SVC_TUNNEL || 'cloudflared-dashboard';
+  return '';
+}
+
+function getExtraServices() {
+  return (process.env.SVC_EXTRA || 'searxng,ollama').split(',').map(s => s.trim()).filter(Boolean);
+}
+
+function getAllowedServices() {
+  return ['openclaw', 'openclaw-gateway', getServiceName('dashboard'), getServiceName('tunnel'), ...getExtraServices()].filter(Boolean);
+}
+
+// Startup snapshots for legacy read-only paths that still use module-level constants.
+const WORKSPACE = getWorkspace();
+const OPENCLAW_HOME = getOpenClawHome();
+const AGENT_NAME = getAgentName();
+const SESSIONS_DIR = getSessionsDir();
+const SVC_DASHBOARD = getServiceName('dashboard');
+const SVC_TUNNEL = getServiceName('tunnel');
+const SVC_EXTRA = getExtraServices();
+
 // Config lives in user home, not inside the npm package (which may be root-owned)
-const CONFIG_DIR = process.env.OPENCLAW_DASHBOARD_CONFIG || path.join(OPENCLAW_HOME, 'dashboard', 'config');
+const CONFIG_DIR = process.env.OPENCLAW_DASHBOARD_CONFIG || path.join(getOpenClawHome(), 'dashboard', 'config');
 if (!fs.existsSync(CONFIG_DIR)) fs.mkdirSync(CONFIG_DIR, { recursive: true });
+
+function pickWritableSessionStorePath() {
+  const candidates = [
+    path.join(CONFIG_DIR, 'dashboard-sessions.json'),
+    path.join(os.tmpdir(), 'openclaw-dashboard-sessions.json')
+  ];
+  for (const candidate of candidates) {
+    try {
+      fs.mkdirSync(path.dirname(candidate), { recursive: true });
+      const probe = candidate + '.write-test';
+      fs.writeFileSync(probe, '');
+      fs.unlinkSync(probe);
+      return candidate;
+    } catch {
+      // try next candidate
+    }
+  }
+  return path.join(os.tmpdir(), 'openclaw-dashboard-sessions.json');
+}
+
+const SESSION_STORE_PATH = pickWritableSessionStorePath();
 
 const AUTH_CONFIG_PATH = path.join(CONFIG_DIR, 'dashboard-auth.json');
 function getAuthConfig() {
@@ -53,19 +119,148 @@ function getAuthConfig() {
   catch { return { username: 'admin', passwordHash: '$2a$10$placeholder' }; }
 }
 
+function getSessionSecret() {
+  const configured = String(process.env.SESSION_SECRET || '');
+  if (configured.length >= 32) return configured;
+  return crypto.randomBytes(32).toString('hex');
+}
+
+class FileSessionStore extends session.Store {
+  constructor(filePath) {
+    super();
+    this.filePath = filePath;
+    this._ensure();
+  }
+
+  _ensure() {
+    fs.mkdirSync(path.dirname(this.filePath), { recursive: true });
+    if (!fs.existsSync(this.filePath)) fs.writeFileSync(this.filePath, '{}\n');
+  }
+
+  _readAll() {
+    this._ensure();
+    try {
+      const data = JSON.parse(fs.readFileSync(this.filePath, 'utf8'));
+      const now = Date.now();
+      let mutated = false;
+      for (const [sid, sess] of Object.entries(data)) {
+        const expiresAt = sess?.cookie?.expires ? new Date(sess.cookie.expires).getTime() : null;
+        if (expiresAt && expiresAt <= now) {
+          delete data[sid];
+          mutated = true;
+        }
+      }
+      if (mutated) this._writeAll(data);
+      return data;
+    } catch {
+      return {};
+    }
+  }
+
+  _writeAll(data) {
+    fs.writeFileSync(this.filePath, JSON.stringify(data, null, 2));
+  }
+
+  get(sid, cb) {
+    try {
+      const data = this._readAll();
+      cb(null, data[sid] || null);
+    } catch (err) {
+      cb(err);
+    }
+  }
+
+  set(sid, sess, cb) {
+    try {
+      const data = this._readAll();
+      data[sid] = sess;
+      this._writeAll(data);
+      cb && cb(null);
+    } catch (err) {
+      cb && cb(err);
+    }
+  }
+
+  destroy(sid, cb) {
+    try {
+      const data = this._readAll();
+      delete data[sid];
+      this._writeAll(data);
+      cb && cb(null);
+    } catch (err) {
+      cb && cb(err);
+    }
+  }
+
+  touch(sid, sess, cb) {
+    this.set(sid, sess, cb);
+  }
+}
+
+app.set('trust proxy', 1);
+app.use(express.json({ limit: '1mb' }));
+app.use(express.urlencoded({ extended: false, limit: '200kb' }));
 app.use(session({
-  secret: process.env.SESSION_SECRET || 'change-me-in-production',
+  store: new FileSessionStore(SESSION_STORE_PATH),
+  secret: getSessionSecret(),
   resave: false,
   saveUninitialized: false,
-  cookie: { secure: false, maxAge: 24 * 60 * 60 * 1000 } // 24h
+  cookie: {
+    secure: 'auto',
+    sameSite: 'lax',
+    httpOnly: true,
+    maxAge: 24 * 60 * 60 * 1000
+  }
 }));
 
 // Check if setup has been completed
 function isSetupComplete() {
+  if (process.env.FORCE_SETUP === '1') return false;
   try {
     const cfg = JSON.parse(fs.readFileSync(AUTH_CONFIG_PATH, 'utf8'));
     return cfg.passwordHash && cfg.passwordHash !== '$2a$10$placeholder';
   } catch { return false; }
+}
+
+function isLocalRequest(req) {
+  const ip = String(req.ip || req.socket?.remoteAddress || '').replace(/^::ffff:/, '');
+  const host = String(req.headers.host || '').split(':')[0];
+  return ip === '127.0.0.1' || ip === '::1' || host === 'localhost';
+}
+
+function safeRedirectPath(input) {
+  if (typeof input !== 'string' || !input.startsWith('/') || input.startsWith('//')) return '/';
+  return input;
+}
+
+function requireSameOrigin(req, res, next) {
+  if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) return next();
+  if (!isSetupComplete() && (req.path === '/setup' || req.path === '/setup.html' || req.path.startsWith('/api/setup/'))) return next();
+  if (req.path === '/api/mobile-log' || req.path === '/api/contact') return next();
+
+  const host = String(req.headers.host || '');
+  const origin = String(req.headers.origin || '');
+  const referer = String(req.headers.referer || '');
+  const allowedPrefixes = [`http://${host}/`, `https://${host}/`];
+  const matches = (value) => allowedPrefixes.some(prefix => value.startsWith(prefix));
+
+  if (origin && !allowedPrefixes.some(prefix => prefix.slice(0, -1) === origin)) {
+    return res.status(403).json({ error: 'Cross-site request rejected' });
+  }
+  if (!origin && referer && !matches(referer)) {
+    return res.status(403).json({ error: 'Cross-site request rejected' });
+  }
+  next();
+}
+
+app.use(requireSameOrigin);
+
+function requireSetupLocalAccess(req, res, next) {
+  if (isSetupComplete() || isLocalRequest(req)) return next();
+  if (req.path.startsWith('/api/')) {
+    return res.status(403).json({ error: 'Setup is only available from localhost until bootstrap completes' });
+  }
+  res.status(403).send('Setup is only available from localhost until bootstrap completes');
 }
 
 // Auth middleware — protect everything except /login, /setup, and /api/auth/*
@@ -73,12 +268,12 @@ function requireAuth(req, res, next) {
   // Always allow login and setup pages
   if (req.path === '/login' || req.path === '/login.html') return next();
   if (req.path === '/setup' || req.path === '/setup.html') {
-    if (!isSetupComplete()) return next();
+    if (!isSetupComplete()) return requireSetupLocalAccess(req, res, next);
     return res.redirect('/login');
   }
-  // Setup APIs — allow pre-setup always, post-setup with auth
+  // Setup APIs — localhost-only pre-bootstrap, auth-protected afterwards
   if (req.path.startsWith('/api/setup/')) {
-    if (!isSetupComplete()) return next();
+    if (!isSetupComplete()) return requireSetupLocalAccess(req, res, next);
     // After setup, treat like normal API (fall through to auth check below)
   }
   // Setup wizard — redirect everything if setup not complete
@@ -100,39 +295,41 @@ app.get('/login', (req, res) => {
 });
 
 // POST /login
-app.post('/login', express.urlencoded({ extended: false }), (req, res) => {
+app.post('/login', (req, res) => {
   const { username, password } = req.body || {};
   const cfg = getAuthConfig();
   if (username === cfg.username && bcrypt.compareSync(password, cfg.passwordHash)) {
     req.session.authenticated = true;
     req.session.username = username;
-    const next = req.query.next || '/';
-    return res.redirect(next);
+    const nextPath = safeRedirectPath(req.body?.next || req.query.next || '/');
+    return res.redirect(nextPath);
   }
-  res.redirect('/login?error=1');
+  const retryTarget = safeRedirectPath(req.body?.next || req.query.next || '/');
+  res.redirect('/login?error=1&next=' + encodeURIComponent(retryTarget));
 });
 
-// GET /logout
-app.get('/logout', (req, res) => {
-  req.session.destroy();
-  res.redirect('/login');
+// POST /logout
+app.post('/logout', requireAuth, (req, res) => {
+  req.session.destroy(() => {
+    res.redirect('/login');
+  });
 });
 
 // POST /api/auth/change-password
-app.post('/api/auth/change-password', express.json(), requireAuth, (req, res) => {
+app.post('/api/auth/change-password', requireAuth, (req, res) => {
   const { currentPassword, newPassword } = req.body;
   const cfg = getAuthConfig();
   if (!bcrypt.compareSync(currentPassword, cfg.passwordHash)) {
     return res.json({ error: 'Current password incorrect' });
   }
-  if (!newPassword || newPassword.length < 6) return res.json({ error: 'New password too short' });
+  if (!newPassword || newPassword.length < 8) return res.json({ error: 'New password must be at least 8 characters' });
   cfg.passwordHash = bcrypt.hashSync(newPassword, 10);
   fs.writeFileSync(AUTH_CONFIG_PATH, JSON.stringify(cfg, null, 2));
   res.json({ ok: true });
 });
 
 // ARC website bypass — serve arc.net.pk WITHOUT auth (public site)
-const ARC_SITE = path.join(WORKSPACE, 'arc-consultancy');
+const ARC_SITE = path.join(getWorkspace(), 'arc-consultancy');
 const ARC_HOSTS = ['arc.net.pk', 'www.arc.net.pk'];
 
 app.use((req, res, next) => {
@@ -151,20 +348,59 @@ app.get('/', (req, res, next) => {
 });
 
 // Mobile app remote logging (before auth)
-app.post('/api/mobile-log', express.json(), (req, res) => {
-  const entry = `[${new Date().toISOString()}] ${JSON.stringify(req.body)}\n`;
-  fs.appendFileSync(path.join(WORKSPACE, 'tradeiators/mobile-debug.log'), entry);
-  res.json({ok:true});
+const publicWriteWindowMs = 60 * 1000;
+const publicWriteLimit = new Map();
+
+function consumePublicWriteBudget(key, limit) {
+  const now = Date.now();
+  const current = publicWriteLimit.get(key);
+  if (!current || current.resetAt <= now) {
+    publicWriteLimit.set(key, { count: 1, resetAt: now + publicWriteWindowMs });
+    return true;
+  }
+  if (current.count >= limit) return false;
+  current.count += 1;
+  return true;
+}
+
+function sanitizePublicLogValue(value, maxLength = 500) {
+  return String(value == null ? '' : value).replace(/[\r\n\t]+/g, ' ').trim().slice(0, maxLength);
+}
+
+app.post('/api/mobile-log', async (req, res) => {
+  const remoteKey = 'mobile-log:' + (req.ip || 'unknown');
+  if (!consumePublicWriteBudget(remoteKey, 60)) {
+    return res.status(429).json({ error: 'Rate limit exceeded' });
+  }
+  const safeBody = {};
+  for (const [key, value] of Object.entries(req.body || {})) {
+    safeBody[sanitizePublicLogValue(key, 64)] = sanitizePublicLogValue(value, 1000);
+  }
+  const entry = `[${new Date().toISOString()}] ${JSON.stringify(safeBody)}\n`;
+  try {
+    await fs.promises.appendFile(path.join(getWorkspace(), 'tradeiators/mobile-debug.log'), entry, 'utf8');
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 // ARC contact form (before auth — public)
-app.post('/api/contact', express.json(), (req, res) => {
+app.post('/api/contact', async (req, res) => {
+  const remoteKey = 'contact:' + (req.ip || 'unknown');
+  if (!consumePublicWriteBudget(remoteKey, 12)) {
+    return res.status(429).json({ error: 'Rate limit exceeded' });
+  }
   const { name, email, company, service, message } = req.body || {};
   if (!name || !email) return res.status(400).json({ error: 'Name and email required' });
-  const entry = `[${new Date().toISOString()}] NAME: ${name} | EMAIL: ${email} | COMPANY: ${company || 'N/A'} | SERVICE: ${service} | MSG: ${message}\n`;
-  fs.appendFileSync(path.join(WORKSPACE, 'arc-consultancy/inquiries.log'), entry);
-  console.log('[ARC Contact]', entry.trim());
-  res.json({ ok: true });
+  const entry = `[${new Date().toISOString()}] NAME: ${sanitizePublicLogValue(name)} | EMAIL: ${sanitizePublicLogValue(email)} | COMPANY: ${sanitizePublicLogValue(company || 'N/A')} | SERVICE: ${sanitizePublicLogValue(service)} | MSG: ${sanitizePublicLogValue(message, 4000)}\n`;
+  try {
+    await fs.promises.appendFile(path.join(getWorkspace(), 'arc-consultancy/inquiries.log'), entry, 'utf8');
+    console.log('[ARC Contact]', entry.trim());
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 // Apply auth to ALL subsequent routes (login/logout above are exempt, ARC above is exempt)
@@ -206,11 +442,257 @@ function neuralLastTrainedIso(db) {
 function exec(cmd, fallback = '') {
   try { return execSync(cmd, { timeout: 5000, encoding: 'utf8' }).trim(); } catch { return fallback; }
 }
+function runCommand(command, args = [], opts = {}) {
+  try {
+    const stdout = execFileSync(command, args, {
+      timeout: opts.timeout || 5000,
+      encoding: 'utf8',
+      input: opts.input,
+      cwd: opts.cwd
+    });
+    return { ok: true, stdout: String(stdout || '').trim(), stderr: '' };
+  } catch (error) {
+    return {
+      ok: false,
+      stdout: String(error.stdout || '').trim(),
+      stderr: String(error.stderr || '').trim(),
+      error
+    };
+  }
+}
+function requireCommandOutput(command, args = [], opts = {}) {
+  const result = runCommand(command, args, opts);
+  if (!result.ok) throw new Error(result.stderr || result.stdout || result.error?.message || `${command} failed`);
+  return result.stdout;
+}
 function readFile(p, fallback = '') {
   try { return fs.readFileSync(p, 'utf8'); } catch { return fallback; }
 }
 function fileAge(p) {
   try { return Date.now() - fs.statSync(p).mtimeMs; } catch { return null; }
+}
+
+function sanitizeEnvValue(value, maxLength = 4096) {
+  return String(value == null ? '' : value).replace(/[\r\n]+/g, ' ').trim().slice(0, maxLength);
+}
+
+function serializeEnvValue(value) {
+  const sanitized = sanitizeEnvValue(value);
+  return `"${sanitized.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
+}
+
+function readOpenClawConfig() {
+  const candidates = [
+    path.join(getOpenClawHome(), 'config.json'),
+    path.join(getOpenClawHome(), 'openclaw.json')
+  ];
+  for (const cfgPath of candidates) {
+    try {
+      return JSON.parse(fs.readFileSync(cfgPath, 'utf8'));
+    } catch {
+      // keep trying
+    }
+  }
+  return null;
+}
+
+function getConfiguredProviderKeys() {
+  const cfg = readOpenClawConfig() || {};
+  const providers = cfg.providers || cfg.llm || {};
+  return {
+    anthropic: process.env.ANTHROPIC_API_KEY || providers.anthropic?.apiKey || cfg.anthropicApiKey || '',
+    openrouter: process.env.OPENROUTER_API_KEY || providers.openrouter?.apiKey || cfg.openrouterApiKey || '',
+    openai: process.env.OPENAI_API_KEY || providers.openai?.apiKey || cfg.openaiApiKey || ''
+  };
+}
+
+function isTextFileExt(ext) {
+  return ['.md', '.txt', '.json', '.yml', '.yaml', '.toml', '.sh', '.js', '.mjs', '.cjs', '.py', '.ts', '.tsx', '.jsx', '.css', '.html'].includes(ext.toLowerCase());
+}
+
+function getWorkspaceRootRealPath() {
+  const workspace = getWorkspace();
+  if (!fs.existsSync(workspace)) fs.mkdirSync(workspace, { recursive: true });
+  return fs.realpathSync(workspace);
+}
+
+function resolveWorkspacePath(relPath, options = {}) {
+  const relativePath = String(relPath || '');
+  if (!relativePath || path.isAbsolute(relativePath) || relativePath.includes('\0')) {
+    throw new Error('Invalid path');
+  }
+  const normalized = path.posix.normalize(relativePath.replace(/\\/g, '/'));
+  if (normalized.startsWith('../') || normalized === '..') throw new Error('Invalid path');
+
+  const workspaceRoot = getWorkspaceRootRealPath();
+  const candidate = path.resolve(workspaceRoot, normalized);
+  let targetPath;
+  if (options.allowMissing && !fs.existsSync(candidate)) {
+    let parent = path.dirname(candidate);
+    while (!fs.existsSync(parent) && parent !== workspaceRoot && parent !== path.dirname(parent)) {
+      parent = path.dirname(parent);
+    }
+    targetPath = fs.realpathSync(parent);
+  } else {
+    targetPath = fs.realpathSync(candidate);
+  }
+  if (targetPath !== workspaceRoot && !targetPath.startsWith(workspaceRoot + path.sep)) {
+    throw new Error('Path escapes workspace');
+  }
+  return candidate;
+}
+
+function walkWorkspaceFiles() {
+  const workspaceRoot = getWorkspaceRootRealPath();
+  const results = [];
+  const queue = [''];
+  const skipNames = new Set(['.git', 'node_modules', '.next', 'dist', 'build']);
+
+  while (queue.length) {
+    const relDir = queue.shift();
+    const absDir = relDir ? path.join(workspaceRoot, relDir) : workspaceRoot;
+    let entries = [];
+    try {
+      entries = fs.readdirSync(absDir, { withFileTypes: true });
+    } catch {
+      continue;
+    }
+
+    for (const entry of entries) {
+      if (entry.isSymbolicLink()) continue;
+      if (skipNames.has(entry.name)) continue;
+      const relPath = relDir ? path.posix.join(relDir, entry.name) : entry.name;
+      const absPath = path.join(absDir, entry.name);
+      if (entry.isDirectory()) {
+        queue.push(relPath);
+        continue;
+      }
+      const ext = path.extname(entry.name);
+      if (!isTextFileExt(ext)) continue;
+      try {
+        const stat = fs.statSync(absPath);
+        const category = relPath.startsWith('memory/') ? 'memory' : CORE_FILES.some(f => f.path === relPath) ? 'core' : 'workspace';
+        results.push({ name: entry.name, path: relPath, size: stat.size, mtime: stat.mtime.toISOString(), category });
+      } catch {
+        // skip unreadable files
+      }
+    }
+  }
+
+  return results.sort((a, b) => a.path.localeCompare(b.path));
+}
+
+function invalidateWorkspaceCaches() {
+  cache.del('workspace_files');
+  const prefix = 'ws_search_';
+  for (const key of Object.keys(cache._s)) {
+    if (key.startsWith(prefix)) cache.del(key);
+  }
+}
+
+function readWorkspaceSearchResults(query) {
+  const lowerQuery = query.toLowerCase();
+  const results = [];
+  const fileCounts = {};
+
+  for (const file of walkWorkspaceFiles()) {
+    if (file.size > 500 * 1024) continue;
+    let content = '';
+    try {
+      content = fs.readFileSync(resolveWorkspacePath(file.path), 'utf8');
+    } catch {
+      continue;
+    }
+    const lines = content.split('\n');
+    let perFileMatches = 0;
+    for (let index = 0; index < lines.length; index++) {
+      const line = lines[index];
+      if (!line.toLowerCase().includes(lowerQuery)) continue;
+      if (!fileCounts[file.path]) fileCounts[file.path] = 0;
+      fileCounts[file.path] += 1;
+      perFileMatches += 1;
+      results.push({ file: file.path, line: index + 1, text: line.trim().slice(0, 240) });
+      if (perFileMatches >= 5 || results.length >= 100) break;
+    }
+    if (results.length >= 100) break;
+  }
+
+  return { results, totalFiles: Object.keys(fileCounts).length, totalMatches: results.length };
+}
+
+function validateCronId(id) {
+  if (!/^[a-zA-Z0-9._:-]{1,120}$/.test(String(id || ''))) {
+    throw new Error('Invalid cron ID');
+  }
+  return String(id);
+}
+
+function validateCronPayload(body, { partial = false } = {}) {
+  const payload = body || {};
+  const out = {};
+  const required = partial ? [] : ['name', 'schedule', 'message'];
+
+  function validateText(key, maxLength, pattern) {
+    if (payload[key] == null || payload[key] === '') {
+      if (required.includes(key)) throw new Error(`${key} is required`);
+      return;
+    }
+    const value = String(payload[key]).trim();
+    if (!value) throw new Error(`${key} is required`);
+    if (value.length > maxLength) throw new Error(`${key} is too long`);
+    if (pattern && !pattern.test(value)) throw new Error(`Invalid ${key}`);
+    out[key] = value;
+  }
+
+  validateText('name', 80, /^[\w .:@/+(),-]+$/);
+  validateText('description', 200);
+  validateText('schedule', 80, /^[A-Za-z0-9*/,\- ]+$/);
+  validateText('tz', 64, /^[A-Za-z0-9_+\-/]+$/);
+  validateText('model', 160, /^[A-Za-z0-9._:/-]+$/);
+  validateText('message', 4000);
+  validateText('to', 200, /^[A-Za-z0-9_@+:/.,#\- ]+$/);
+
+  if (payload.timeout != null && payload.timeout !== '') {
+    const timeout = parseInt(payload.timeout, 10);
+    if (!Number.isInteger(timeout) || timeout < 1 || timeout > 86400) throw new Error('Invalid timeout');
+    out.timeout = timeout;
+  }
+
+  if (payload.channel != null && payload.channel !== '') {
+    const channel = String(payload.channel).trim();
+    const allowedChannels = new Set(['whatsapp', 'telegram', 'msteams', 'discord']);
+    if (!allowedChannels.has(channel)) throw new Error('Invalid channel');
+    out.channel = channel;
+  }
+
+  if (out.channel && !out.to) throw new Error('Delivery target is required when channel is set');
+  if (out.to && !out.channel) throw new Error('Delivery channel is required when target is set');
+  if (!partial) {
+    out.tz = out.tz || 'UTC';
+  }
+  return out;
+}
+
+function runOpenClawCron(args) {
+  return requireCommandOutput('openclaw', ['cron', ...args], { timeout: 10000 });
+}
+
+function safeSessionFile(sessionId) {
+  if (!/^[a-zA-Z0-9_-]{1,120}$/.test(String(sessionId || ''))) throw new Error('Invalid session ID');
+  return path.join(getSessionsDir(), sessionId + '.jsonl');
+}
+
+async function fetchJsonWithTimeout(url, options = {}, timeoutMs = 5000) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, { ...options, signal: controller.signal });
+    let data = null;
+    try { data = await response.json(); } catch { data = null; }
+    return { response, data };
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 function truncateText(v, n = 140) {
@@ -438,14 +920,14 @@ app.get('/api/activity', (req, res) => {
   
   // Live: systemd service statuses
   const services = {};
-  for (const svc of [SVC_DASHBOARD, SVC_TUNNEL, ...SVC_EXTRA]) {
+  for (const svc of [getServiceName('dashboard'), getServiceName('tunnel'), ...getExtraServices()]) {
     const status = exec(`systemctl is-active ${svc} 2>/dev/null`, 'unknown');
     const since = exec(`systemctl show ${svc} --property=ActiveEnterTimestamp --value 2>/dev/null`);
     services[svc] = { status, since };
   }
   
   // Live: recent git commits in workspace
-  const gitLog = exec(`cd ${WORKSPACE} && git log --oneline --since="2 days ago" -10 2>/dev/null`);
+  const gitLog = exec(`cd ${getWorkspace()} && git log --oneline --since="2 days ago" -10 2>/dev/null`);
   
   // Live: OpenClaw journal (last 20 entries today)
   const journal = exec(`journalctl -u openclaw --since today --no-pager -q --output=short-iso 2>/dev/null | tail -15`);
@@ -563,9 +1045,9 @@ app.get('/api/activity/feed', (req, res) => {
 app.get('/api/crons', (req, res) => {
   const hit = cache.get('crons_simple');
   if (hit) return res.json(hit);
-  const cronData = exec("openclaw cron list --json 2>/dev/null");
+  const cronData = runCommand('openclaw', ['cron', 'list', '--json'], { timeout: 10000 });
   let jobs = [];
-  try { jobs = JSON.parse(cronData)?.jobs || []; } catch {}
+  try { jobs = JSON.parse(cronData.stdout || '{}')?.jobs || []; } catch {}
   const result = { jobs };
   cache.set('crons_simple', result, 30000); // cache 30s
   res.json(result);
@@ -574,71 +1056,83 @@ app.get('/api/crons', (req, res) => {
 // API: cron CRUD operations
 app.post('/api/crons', (req, res) => {
   try {
-    const { name, description, schedule, tz, model, timeout, message, channel, to } = req.body;
-    if (!name || !schedule || !message) return res.json({ error: 'Name, schedule, and message are required' });
-    let cmd = `openclaw cron add --name "${name.replace(/"/g, '\\"')}" --schedule "${schedule}" --tz "${tz || 'UTC'}" --message "${message.replace(/"/g, '\\"')}"`;
-    if (model) cmd += ` --model "${model}"`;
-    if (timeout) cmd += ` --timeout ${timeout}`;
-    if (description) cmd += ` --description "${description.replace(/"/g, '\\"')}"`;
-    if (channel && to) cmd += ` --announce ${channel} --to "${to}"`;
-    const result = exec(cmd + ' 2>&1');
-    cache.delete('crons_simple');
-    cache.delete('orch_crons');
-    res.json({ ok: true, output: result });
-  } catch (e) { res.json({ error: e.message }); }
+    const payload = validateCronPayload(req.body);
+    const args = ['add', '--name', payload.name, '--schedule', payload.schedule, '--tz', payload.tz, '--message', payload.message];
+    if (payload.model) args.push('--model', payload.model);
+    if (payload.timeout) args.push('--timeout', String(payload.timeout));
+    if (payload.description) args.push('--description', payload.description);
+    if (payload.channel && payload.to) args.push('--announce', payload.channel, '--to', payload.to);
+    const output = runOpenClawCron(args);
+    cache.del('crons_simple');
+    cache.del('orch_crons');
+    res.json({ ok: true, output });
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
 });
 
 app.put('/api/crons/:id', (req, res) => {
   try {
-    const { id } = req.params;
-    const { name, description, schedule, tz, model, timeout, message, channel, to } = req.body;
-    let cmd = `openclaw cron edit ${id}`;
-    if (name) cmd += ` --name "${name.replace(/"/g, '\\"')}"`;
-    if (schedule) cmd += ` --schedule "${schedule}"`;
-    if (tz) cmd += ` --tz "${tz}"`;
-    if (model) cmd += ` --model "${model}"`;
-    if (timeout) cmd += ` --timeout ${timeout}`;
-    if (message) cmd += ` --message "${message.replace(/"/g, '\\"')}"`;
-    if (description) cmd += ` --description "${description.replace(/"/g, '\\"')}"`;
-    const result = exec(cmd + ' 2>&1');
-    cache.delete('crons_simple');
-    cache.delete('orch_crons');
-    res.json({ ok: true, output: result });
-  } catch (e) { res.json({ error: e.message }); }
+    const id = validateCronId(req.params.id);
+    const payload = validateCronPayload(req.body, { partial: true });
+    const args = ['edit', id];
+    if (payload.name) args.push('--name', payload.name);
+    if (payload.schedule) args.push('--schedule', payload.schedule);
+    if (payload.tz) args.push('--tz', payload.tz);
+    if (payload.model) args.push('--model', payload.model);
+    if (payload.timeout) args.push('--timeout', String(payload.timeout));
+    if (payload.message) args.push('--message', payload.message);
+    if (payload.description) args.push('--description', payload.description);
+    if (payload.channel && payload.to) args.push('--announce', payload.channel, '--to', payload.to);
+    const output = runOpenClawCron(args);
+    cache.del('crons_simple');
+    cache.del('orch_crons');
+    res.json({ ok: true, output });
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
 });
 
 app.post('/api/crons/:id/enable', (req, res) => {
   try {
-    const result = exec(`openclaw cron enable ${req.params.id} 2>&1`);
-    cache.delete('crons_simple');
-    cache.delete('orch_crons');
-    res.json({ ok: true, output: result });
-  } catch (e) { res.json({ error: e.message }); }
+    const output = runOpenClawCron(['enable', validateCronId(req.params.id)]);
+    cache.del('crons_simple');
+    cache.del('orch_crons');
+    res.json({ ok: true, output });
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
 });
 
 app.post('/api/crons/:id/disable', (req, res) => {
   try {
-    const result = exec(`openclaw cron disable ${req.params.id} 2>&1`);
-    cache.delete('crons_simple');
-    cache.delete('orch_crons');
-    res.json({ ok: true, output: result });
-  } catch (e) { res.json({ error: e.message }); }
+    const output = runOpenClawCron(['disable', validateCronId(req.params.id)]);
+    cache.del('crons_simple');
+    cache.del('orch_crons');
+    res.json({ ok: true, output });
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
 });
 
 app.post('/api/crons/:id/run', (req, res) => {
   try {
-    const result = exec(`openclaw cron run ${req.params.id} 2>&1`);
-    res.json({ ok: true, output: result });
-  } catch (e) { res.json({ error: e.message }); }
+    const output = runOpenClawCron(['run', validateCronId(req.params.id)]);
+    res.json({ ok: true, output });
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
 });
 
 app.delete('/api/crons/:id', (req, res) => {
   try {
-    const result = exec(`openclaw cron rm ${req.params.id} --yes 2>&1`);
-    cache.delete('crons_simple');
-    cache.delete('orch_crons');
-    res.json({ ok: true, output: result });
-  } catch (e) { res.json({ error: e.message }); }
+    const output = runOpenClawCron(['rm', validateCronId(req.params.id), '--yes']);
+    cache.del('crons_simple');
+    cache.del('orch_crons');
+    res.json({ ok: true, output });
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
 });
 
 // API: stats/today — compact session activity summary for dashboard card
@@ -1327,7 +1821,7 @@ app.get('/api/orchestration/session/:id', (req, res) => {
     } catch {}
   }
   
-  res.json({ id: req.params.id, messageCount: lines.length, messages: messages.slice(0, 100) });
+  res.json({ id: req.params.id, messageCount: lines.length, messages: messages.slice(-100) });
 });
 
 // API: orchestration - toggle cron job enabled/disabled
@@ -1338,12 +1832,12 @@ app.post('/api/orchestration/cron/toggle', express.json(), (req, res) => {
   
   try {
     const command = enabled ? 'enable' : 'disable';
-    const result = exec(`openclaw cron ${command} "${jobId}" 2>&1`);
+    const result = runOpenClawCron([command, validateCronId(jobId)]);
     
     // Get updated job state
-    const cronData = exec(`openclaw cron list --json 2>/dev/null`);
+    const cronData = runCommand('openclaw', ['cron', 'list', '--json'], { timeout: 10000 });
     let jobs = [];
-    try { jobs = JSON.parse(cronData)?.jobs || []; } catch {}
+    try { jobs = JSON.parse(cronData.stdout || '{}')?.jobs || []; } catch {}
     const updatedJob = jobs.find(j => j.id === jobId);
     
     // Invalidate cron caches so next load shows updated state
@@ -1366,7 +1860,7 @@ app.post('/api/orchestration/cron/run', express.json(), (req, res) => {
   if (!jobId) return res.status(400).json({ error: 'Missing jobId' });
   
   try {
-    const result = exec(`openclaw cron run "${jobId}" 2>&1`);
+    const result = runOpenClawCron(['run', validateCronId(jobId)]);
     
     // Invalidate cron caches so dashboard reflects the triggered run
     cache.del('orch_crons');
@@ -1392,7 +1886,10 @@ app.post('/api/orchestration/kill', express.json(), (req, res) => {
   }
   
   try {
-    const sessStore = path.join(SESSIONS_DIR, 'sessions.json');
+    if (!/^[a-zA-Z0-9:_-]{4,200}$/.test(sessionKey)) {
+      return res.status(400).json({ error: 'Invalid sessionKey' });
+    }
+    const sessStore = path.join(getSessionsDir(), 'sessions.json');
     let sessIndex = {};
     try { sessIndex = JSON.parse(fs.readFileSync(sessStore, 'utf8')); } catch {}
     
@@ -1403,19 +1900,44 @@ app.post('/api/orchestration/kill', express.json(), (req, res) => {
     }
     
     const sessionId = entry.sessionId;
-    const sessionFile = path.join(SESSIONS_DIR, sessionId + '.jsonl');
-    
-    // Rename session file to mark as deleted/aborted
-    if (fs.existsSync(sessionFile)) {
-      const deletedName = sessionFile + '.deleted.' + new Date().toISOString().replace(/:/g, '-');
-      fs.renameSync(sessionFile, deletedName);
+    const stopAttempts = [
+      ['sessions', 'kill', sessionKey],
+      ['sessions', 'kill', sessionId],
+      ['session', 'kill', sessionKey],
+      ['session', 'kill', sessionId],
+      ['sessions', 'stop', sessionKey],
+      ['sessions', 'stop', sessionId]
+    ];
+
+    let stopOutput = '';
+    let stopped = false;
+    let lastError = 'Session termination failed';
+    for (const args of stopAttempts) {
+      const result = runCommand('openclaw', args, { timeout: 10000 });
+      if (result.ok) {
+        stopOutput = result.stdout || result.stderr;
+        stopped = true;
+        break;
+      }
+      lastError = result.stderr || result.stdout || result.error?.message || lastError;
     }
-    
-    // Remove from sessions index
+    if (!stopped) {
+      return res.status(500).json({ error: lastError });
+    }
+
     delete sessIndex[sessionKey];
     fs.writeFileSync(sessStore, JSON.stringify(sessIndex, null, 2));
-    
-    res.json({ ok: true, message: 'Session killed', sessionKey, sessionId });
+
+    const sessionFile = safeSessionFile(sessionId);
+    if (fs.existsSync(sessionFile)) {
+      fs.appendFileSync(sessionFile, JSON.stringify({
+        type: 'aborted',
+        reason: 'Killed from dashboard',
+        timestamp: new Date().toISOString()
+      }) + '\n');
+    }
+
+    res.json({ ok: true, message: 'Session killed', sessionKey, sessionId, output: stopOutput });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -1786,28 +2308,27 @@ app.get('/api/status/heartbeat', (req, res) => {
 // API: settings - models list from OpenRouter
 app.get('/api/settings/models', async (req, res) => {
   try {
-    const orKey = process.env.OPENROUTER_API_KEY || exec("grep OPENROUTER_API_KEY ' + (process.env.OPENCLAW_HOME || path.resolve(os.homedir(), '.openclaw')) + '/openclaw.json | head -1 | grep -oP '\"[^\"]+\"$'").replace(/"/g, '');
-    
-    // Fetch models
-    const modelsRaw = exec(`curl -s https://openrouter.ai/api/v1/models -H "Authorization: Bearer ${orKey}"`, '{"data":[]}');
-    let models = [];
-    try { models = JSON.parse(modelsRaw)?.data || []; } catch {}
-    
-    // Fetch balance
+    const orKey = getConfiguredProviderKeys().openrouter;
+    if (!orKey) return res.json({ models: [], balance: null, count: 0, error: 'OpenRouter API key not configured' });
+
+    const modelsResp = await fetchJsonWithTimeout('https://openrouter.ai/api/v1/models', {
+      headers: { Authorization: `Bearer ${orKey}` }
+    }, 8000);
+    const models = modelsResp.data?.data || [];
+
     let balance = null;
-    const balRaw = exec(`curl -s https://openrouter.ai/api/v1/auth/key -H "Authorization: Bearer ${orKey}"`, '{}');
-    try { 
-      const bd = JSON.parse(balRaw);
-      // OpenRouter returns usage (spent), not balance. We need credits endpoint
-      const credRaw = exec(`curl -s https://openrouter.ai/api/v1/credits -H "Authorization: Bearer ${orKey}"`, '{}');
-      try {
-        const cd = JSON.parse(credRaw);
-        balance = cd?.data?.total_credits != null ? (cd.data.total_credits - (cd.data.total_usage || 0)) : null;
-      } catch {}
-      // Fallback: show usage info
-      if (balance === null) balance = { usage: bd?.data?.usage || 0, note: 'usage_only' };
-    } catch {}
-    
+    const authResp = await fetchJsonWithTimeout('https://openrouter.ai/api/v1/auth/key', {
+      headers: { Authorization: `Bearer ${orKey}` }
+    }, 8000);
+    const creditsResp = await fetchJsonWithTimeout('https://openrouter.ai/api/v1/credits', {
+      headers: { Authorization: `Bearer ${orKey}` }
+    }, 8000);
+    if (typeof creditsResp.data?.data?.total_credits === 'number') {
+      balance = creditsResp.data.data.total_credits - (creditsResp.data.data.total_usage || 0);
+    } else if (authResp.data?.data?.usage != null) {
+      balance = { usage: authResp.data.data.usage, note: 'usage_only' };
+    }
+
     res.json({ models, balance, count: models.length });
   } catch(e) {
     res.json({ models: [], error: e.message });
@@ -2169,42 +2690,50 @@ app.get('/api/health/providers', async (req, res) => {
     return res.json(healthCache.data);
   }
 
-  const check = async (name, fn) => {
+  const keys = getConfiguredProviderKeys();
+  const checkProvider = async (name, fn) => {
     const start = Date.now();
     try {
       const result = await fn();
-      return { status: 'ok', latencyMs: Date.now() - start, ...result };
-    } catch {
-      return { status: 'down', latencyMs: Date.now() - start };
+      return { ...result, latencyMs: Date.now() - start };
+    } catch (error) {
+      return { status: 'down', latencyMs: Date.now() - start, error: error.message };
     }
   };
 
-  const anthropicKey = process.env.ANTHROPIC_API_KEY || exec("grep ANTHROPIC_API_KEY ' + (process.env.OPENCLAW_HOME || path.resolve(os.homedir(), '.openclaw')) + '/openclaw.json 2>/dev/null | head -1 | grep -oP '\"[^\"]+\"$'").replace(/"/g, '');
-  const orKey = process.env.OPENROUTER_API_KEY || exec("grep OPENROUTER_API_KEY ' + (process.env.OPENCLAW_HOME || path.resolve(os.homedir(), '.openclaw')) + '/openclaw.json 2>/dev/null | head -1 | grep -oP '\"[^\"]+\"$'").replace(/"/g, '');
-
   const [anthropic, openrouter, ollama, openaiCodex] = await Promise.all([
-    check('anthropic', () => {
-      const code = exec(`curl -s -o /dev/null -w "%{http_code}" -m 5 -H "x-api-key: ${anthropicKey}" -H "anthropic-version: 2023-06-01" https://api.anthropic.com/v1/models`, '0');
-      if (code === '0' || code.startsWith('5')) throw new Error('down');
-      return {};
+    checkProvider('anthropic', async () => {
+      if (!keys.anthropic) return { status: 'config_error', error: 'Missing API key' };
+      const { response } = await fetchJsonWithTimeout('https://api.anthropic.com/v1/models', {
+        headers: { 'x-api-key': keys.anthropic, 'anthropic-version': '2023-06-01' }
+      }, 5000);
+      if (response.status === 401 || response.status === 403) return { status: 'config_error', error: 'Authentication failed' };
+      if (!response.ok) return { status: 'down', error: `HTTP ${response.status}` };
+      return { status: 'ok' };
     }),
-    check('openrouter', () => {
-      const raw = exec(`curl -s -m 5 https://openrouter.ai/api/v1/auth/key -H "Authorization: Bearer ${orKey}"`, '{}');
-      const d = JSON.parse(raw);
-      if (!d.data) throw new Error('down');
-      return { balance: d.data.usage != null ? d.data : undefined };
+    checkProvider('openrouter', async () => {
+      if (!keys.openrouter) return { status: 'config_error', error: 'Missing API key' };
+      const { response, data } = await fetchJsonWithTimeout('https://openrouter.ai/api/v1/auth/key', {
+        headers: { Authorization: `Bearer ${keys.openrouter}` }
+      }, 5000);
+      if (response.status === 401 || response.status === 403) return { status: 'config_error', error: 'Authentication failed' };
+      if (!response.ok || !data?.data) return { status: 'down', error: `HTTP ${response.status}` };
+      return { status: 'ok', balance: data.data.usage != null ? data.data : undefined };
     }),
-    check('ollama', () => {
-      const raw = exec(`curl -s -m 3 http://localhost:11434/api/tags`, '');
-      if (!raw) throw new Error('down');
-      const d = JSON.parse(raw);
-      return { models: (d.models || []).length };
+    checkProvider('ollama', async () => {
+      const { response, data } = await fetchJsonWithTimeout('http://localhost:11434/api/tags', {}, 3000);
+      if (!response.ok) return { status: 'down', error: `HTTP ${response.status}` };
+      return { status: 'ok', models: (data?.models || []).length };
     }),
-    check('openai-codex', () => {
-      const code = exec(`curl -s -o /dev/null -w "%{http_code}" -m 5 https://api.openai.com/v1/models`, '0');
-      if (code === '0' || code.startsWith('5')) throw new Error('down');
-      return {};
-    }),
+    checkProvider('openai-codex', async () => {
+      if (!keys.openai) return { status: 'config_error', error: 'Missing API key' };
+      const { response } = await fetchJsonWithTimeout('https://api.openai.com/v1/models', {
+        headers: { Authorization: `Bearer ${keys.openai}` }
+      }, 5000);
+      if (response.status === 401 || response.status === 403) return { status: 'config_error', error: 'Authentication failed' };
+      if (!response.ok) return { status: 'down', error: `HTTP ${response.status}` };
+      return { status: 'ok' };
+    })
   ]);
 
   const result = { anthropic, openrouter, ollama, 'openai-codex': openaiCodex, checkedAt: new Date().toISOString() };
@@ -2213,12 +2742,12 @@ app.get('/api/health/providers', async (req, res) => {
 });
 
 // API: log tail
-const ALLOWED_SERVICES = ['openclaw', 'openclaw-gateway', SVC_DASHBOARD, SVC_TUNNEL, ...SVC_EXTRA];
 app.get('/api/logs/tail', (req, res) => {
   const lines = Math.min(Math.max(parseInt(req.query.lines) || 50, 1), 500);
   const service = req.query.service || 'openclaw';
-  if (!ALLOWED_SERVICES.includes(service)) {
-    return res.status(400).json({ error: 'Invalid service', allowed: ALLOWED_SERVICES });
+  const allowedServices = getAllowedServices();
+  if (!allowedServices.includes(service)) {
+    return res.status(400).json({ error: 'Invalid service', allowed: allowedServices });
   }
   const output = exec(`journalctl -u ${service} --no-pager -n ${lines} -o short-iso 2>&1`, '');
   res.json({ lines: output ? output.split('\n') : [], service, timestamp: new Date().toISOString() });
@@ -2230,12 +2759,13 @@ app.get('/api/logs/services-status', (req, res) => {
   const hit = cache.get('log_svc_status');
   if (hit) return res.json(hit);
   const svcs = {};
-  for (const svc of ALLOWED_SERVICES) {
+  const allowedServices = getAllowedServices();
+  for (const svc of allowedServices) {
     // `systemctl show` always exits 0; ActiveState is always readable
     const state = exec(`systemctl show ${svc} --property=ActiveState --value 2>/dev/null`, 'unknown').trim();
     svcs[svc] = state || 'unknown';
   }
-  const result = { services: svcs, checkedAt: new Date().toISOString() };
+  const result = { services: svcs, allowed: allowedServices, checkedAt: new Date().toISOString() };
   cache.set('log_svc_status', result, 15000); // 15s TTL — quick status, low cost
   res.json(result);
 });
@@ -2404,7 +2934,8 @@ app.get('/api/neural/graph', (req, res) => {
       SELECT
         (SELECT COUNT(*) FROM neurons) AS neurons,
         (SELECT COUNT(*) FROM synapses) AS synapses,
-        (SELECT COUNT(*) FROM fibers) AS fibers
+        (SELECT COUNT(*) FROM fibers) AS fibers,
+        (SELECT COUNT(*) FROM neurons WHERE type = 'concept') AS concepts
     `).get();
 
     // Build fiber membership map for neurons (which fiber each neuron belongs to)
@@ -2466,6 +2997,7 @@ app.get('/api/neural/stats', (req, res) => {
       neurons: counts.neurons,
       synapses: counts.synapses,
       fibers: counts.fibers,
+      concepts: counts.concepts,
       topConcepts,
       lastTrained: neuralLastTrainedIso(db)
     };
@@ -2482,16 +3014,11 @@ app.get('/api/neural/recall', (req, res) => {
     const q = String(req.query.q || '').trim();
     if (!q) return res.status(400).json({ error: 'Missing q parameter' });
 
-    const escaped = q.replace(/"/g, '\\"');
-    const output = execSync(`nmem recall "${escaped}"`, {
-      timeout: 8000,
-      encoding: 'utf8'
-    }).trim();
+    const output = requireCommandOutput('nmem', ['recall', q], { timeout: 8000 });
 
     res.json({ query: q, result: output });
   } catch (e) {
-    const stderr = e?.stderr ? String(e.stderr).trim() : '';
-    res.status(500).json({ error: stderr || e.message, query: String(req.query.q || '') });
+    res.status(500).json({ error: e.message, query: String(req.query.q || '') });
   }
 });
 
@@ -2740,47 +3267,21 @@ const CORE_FILES = [
 app.get('/api/workspace/files', (req, res) => {
   const cached = cache.get('workspace_files');
   if (cached) return res.json(cached);
-
-  const files = [];
-
-  // Core files
-  for (const f of CORE_FILES) {
-    const abs = path.join(WORKSPACE, f.path);
-    try {
-      const stat = fs.statSync(abs);
-      files.push({ name: f.name, path: f.path, size: stat.size, mtime: stat.mtime.toISOString(), category: f.category });
-    } catch { /* skip if missing */ }
-  }
-
-  // Memory logs: memory/*.md sorted descending by name
-  const memDir = path.join(WORKSPACE, 'memory');
-  try {
-    const memFiles = fs.readdirSync(memDir)
-      .filter(n => n.endsWith('.md'))
-      .sort()
-      .reverse();
-    for (const n of memFiles) {
-      const abs = path.join(memDir, n);
-      try {
-        const stat = fs.statSync(abs);
-        files.push({ name: n, path: 'memory/' + n, size: stat.size, mtime: stat.mtime.toISOString(), category: 'memory' });
-      } catch { /* skip */ }
-    }
-  } catch { /* memory dir missing */ }
-
-  const result = { files };
+  const result = { files: walkWorkspaceFiles() };
   cache.set('workspace_files', result, 10000);
   res.json(result);
 });
 
 app.get('/api/workspace/file', (req, res) => {
   const relPath = req.query.path;
-  if (!relPath || relPath.startsWith('/') || relPath.includes('..')) {
-    return res.status(400).json({ error: 'Invalid path' });
-  }
-  const abs = path.join(WORKSPACE, relPath);
+  let abs;
   let stat;
-  try { stat = fs.statSync(abs); } catch { return res.status(404).json({ error: 'File not found' }); }
+  try {
+    abs = resolveWorkspacePath(relPath);
+    stat = fs.statSync(abs);
+  } catch (e) {
+    return res.status(404).json({ error: e.message === 'Invalid path' ? e.message : 'File not found' });
+  }
   if (stat.size > 500 * 1024) return res.status(413).json({ error: 'File too large' });
   try {
     const content = fs.readFileSync(abs, 'utf8');
@@ -2796,39 +3297,13 @@ app.get('/api/workspace/search', (req, res) => {
   if (!query || query.length < 2) return res.status(400).json({ error: 'Query too short' });
   if (query.length > 100) return res.status(400).json({ error: 'Query too long' });
 
-  // Sanitise: only allow alphanumeric + common punctuation, reject shell meta
-  if (/[;|`$&(){}[\]<>\\]/.test(query)) return res.status(400).json({ error: 'Invalid characters in query' });
-
   const cacheKey = 'ws_search_' + query.toLowerCase();
   const cached = cache.get(cacheKey);
   if (cached) return res.json(cached);
 
   try {
-    // grep -rn case-insensitive in workspace markdown/json files, max 5 lines per file, limit output
-    const raw = exec(
-      `grep -rni --include="*.md" --include="*.json" -m 5 ${JSON.stringify(query)} ${WORKSPACE} 2>/dev/null | head -100`,
-      ''
-    );
-
-    const results = [];
-    const fileCounts = {};
-    for (const line of raw.split('\n').filter(Boolean)) {
-      const colon1 = line.indexOf(':');
-      const colon2 = line.indexOf(':', colon1 + 1);
-      if (colon1 < 0 || colon2 < 0) continue;
-      const absPath = line.slice(0, colon1);
-      const lineNum = parseInt(line.slice(colon1 + 1, colon2));
-      const text = line.slice(colon2 + 1).trim();
-      const relPath = absPath.startsWith(WORKSPACE + '/') ? absPath.slice(WORKSPACE.length + 1) : absPath;
-
-      // Skip node_modules, .git, binary files
-      if (relPath.includes('node_modules') || relPath.includes('.git') || relPath.includes('/files/')) continue;
-
-      fileCounts[relPath] = (fileCounts[relPath] || 0) + 1;
-      results.push({ file: relPath, line: lineNum, text: text.slice(0, 200) });
-    }
-
-    const out = { query, results, totalFiles: Object.keys(fileCounts).length, totalMatches: results.length };
+    const matches = readWorkspaceSearchResults(query);
+    const out = { query, ...matches };
     cache.set(cacheKey, out, 15000); // 15s cache
     res.json(out);
   } catch (e) {
@@ -2886,38 +3361,33 @@ app.get('/api/memory/health', (req, res) => {
 app.get('/api/network/status', (req, res) => {
   const hit = cache.get('network_status');
   if (hit) return res.json(hit);
+  const tunnelId = sanitizeEnvValue(process.env.TUNNEL_ID || '', 128) || null;
+  const arcUrl = sanitizeEnvValue(process.env.ARC_PUBLIC_URL || '', 512) || null;
+  const dashboardUrl = sanitizeEnvValue(process.env.DASHBOARD_PUBLIC_URL || '', 512) || null;
+  const tunnelActive = exec(`systemctl show ${getServiceName('tunnel')} --property=ActiveState --value 2>/dev/null`, 'unknown').trim();
+  const port = getDashboardPort();
+  const portListening = runCommand('ss', ['-ltn'], { timeout: 3000 }).stdout.split('\n').some(line => line.includes(`:${port} `));
 
-  const TUNNEL_ID = 'fa824c5c-59d3-4bb7-b84e-ba4ba35e98b7'; // from TOOLS.md
-
-  // 1. cloudflared-dashboard service state
-  const tunnelActive = exec(`systemctl show ${SVC_TUNNEL} --property=ActiveState --value 2>/dev/null`, 'unknown').trim();
-
-  // 2. Is port 3000 actually listening?
-  const portOut = exec('ss -ltn 2>/dev/null | grep ":3000 "', '');
-  const portListening = portOut.trim().length > 0;
-
-  // 3. Public URL checks (fast — 4s max each)
-  const arcResult = (() => {
+  const checkUrl = (url) => {
+    if (!url) return null;
     const start = Date.now();
-    const code = exec('curl -s -o /dev/null -w "%{http_code}" -m 4 https://arc.net.pk 2>/dev/null', '0');
-    return { httpStatus: parseInt(code) || 0, latencyMs: Date.now() - start };
-  })();
-
-  const dashResult = (() => {
-    const start = Date.now();
-    const code = exec('curl -s -o /dev/null -w "%{http_code}" -m 4 https://dashboard.arc.net.pk 2>/dev/null', '0');
-    return { httpStatus: parseInt(code) || 0, latencyMs: Date.now() - start };
-  })();
+    try {
+      const raw = exec(`curl -s -o /dev/null -w "%{http_code}" -m 4 ${JSON.stringify(url)} 2>/dev/null`, '0');
+      return { url, httpStatus: parseInt(raw, 10) || 0, latencyMs: Date.now() - start };
+    } catch {
+      return { url, httpStatus: 0, latencyMs: Date.now() - start };
+    }
+  };
 
   const result = {
-    tunnel: { active: tunnelActive },
-    port: { listening: portListening },
-    arc: arcResult,
-    dashboard: dashResult,
-    tunnelId: TUNNEL_ID,
+    tunnel: { active: tunnelActive, configured: Boolean(getServiceName('tunnel')) },
+    port: { listening: portListening, port },
+    arc: checkUrl(arcUrl),
+    dashboard: checkUrl(dashboardUrl),
+    tunnelId,
     checkedAt: new Date().toISOString()
   };
-  cache.set('network_status', result, 30000); // 30s TTL
+  cache.set('network_status', result, 30000);
   res.json(result);
 });
 
@@ -2934,9 +3404,13 @@ app.get('/api/admin/cache-stats', (req, res) => {
     expired: now > e.exp
   })).filter(e => !e.expired);
 
-  const diskWorkspace = exec(`du -sh ${WORKSPACE} 2>/dev/null | cut -f1`, '?');
-  const diskSessions = exec(`du -sh ' + SESSIONS_DIR + ' 2>/dev/null | cut -f1`, '?');
-  const diskNeural   = exec(`du -sh ' + os.homedir() + '/.neuralmemory 2>/dev/null | cut -f1`, '?');
+  const du = (target) => {
+    const result = runCommand('du', ['-sh', target], { timeout: 5000 });
+    return result.ok ? (result.stdout.split(/\s+/)[0] || '?') : '?';
+  };
+  const diskWorkspace = du(getWorkspace());
+  const diskSessions = du(getSessionsDir());
+  const diskNeural = du(path.join(os.homedir(), '.neuralmemory'));
   const processMemMb = (process.memoryUsage().rss / 1024 / 1024).toFixed(1);
 
   res.json({
@@ -2964,7 +3438,7 @@ app.post('/api/admin/clear-cache', express.json(), (req, res) => {
 
 // GET /api/setup/detect — auto-detect OpenClaw installation
 app.get('/api/setup/detect', (req, res) => {
-  const results = { openclawHome: null, agents: [], services: {}, installed: [] };
+  const results = { openclawHome: null, agents: [], services: {}, installed: [], enabledFeatures: [] };
 
   // Detect OpenClaw home
   const candidates = [
@@ -3021,36 +3495,21 @@ app.get('/api/setup/detect', (req, res) => {
   results.keys = {};
   if (results.openclawHome) {
     try {
-      const configPath = path.join(results.openclawHome, 'config.json');
-      const altPath = path.join(results.openclawHome, 'openclaw.json');
-      const cfgFile = fs.existsSync(configPath) ? configPath : fs.existsSync(altPath) ? altPath : null;
-      if (cfgFile) {
-        const cfgText = fs.readFileSync(cfgFile, 'utf8');
-        const cfg = JSON.parse(cfgText);
-        // Check common key locations in OpenClaw config
-        const providers = cfg.providers || cfg.llm || {};
-        if (providers.anthropic?.apiKey || cfg.anthropicApiKey || process.env.ANTHROPIC_API_KEY) {
-          results.keys.anthropic = { detected: true, masked: '••••' + (providers.anthropic?.apiKey || cfg.anthropicApiKey || process.env.ANTHROPIC_API_KEY || '').slice(-6) };
-        }
-        if (providers.openrouter?.apiKey || cfg.openrouterApiKey || process.env.OPENROUTER_API_KEY) {
-          results.keys.openrouter = { detected: true, masked: '••••' + (providers.openrouter?.apiKey || cfg.openrouterApiKey || process.env.OPENROUTER_API_KEY || '').slice(-6) };
-        }
-        if (providers.openai?.apiKey || cfg.openaiApiKey || process.env.OPENAI_API_KEY) {
-          results.keys.openai = { detected: true, masked: '••••' + (providers.openai?.apiKey || cfg.openaiApiKey || process.env.OPENAI_API_KEY || '').slice(-6) };
-        }
-      }
+      const previousHome = process.env.OPENCLAW_HOME;
+      process.env.OPENCLAW_HOME = results.openclawHome;
+      const providerKeys = getConfiguredProviderKeys();
+      if (providerKeys.anthropic) results.keys.anthropic = { detected: true, masked: '••••' + providerKeys.anthropic.slice(-6) };
+      if (providerKeys.openrouter) results.keys.openrouter = { detected: true, masked: '••••' + providerKeys.openrouter.slice(-6) };
+      if (providerKeys.openai) results.keys.openai = { detected: true, masked: '••••' + providerKeys.openai.slice(-6) };
+      if (previousHome === undefined) delete process.env.OPENCLAW_HOME;
+      else process.env.OPENCLAW_HOME = previousHome;
     } catch {}
-    // Fallback: check env vars directly
-    if (!results.keys.anthropic && process.env.ANTHROPIC_API_KEY) {
-      results.keys.anthropic = { detected: true, masked: '••••' + process.env.ANTHROPIC_API_KEY.slice(-6) };
-    }
-    if (!results.keys.openrouter && process.env.OPENROUTER_API_KEY) {
-      results.keys.openrouter = { detected: true, masked: '••••' + process.env.OPENROUTER_API_KEY.slice(-6) };
-    }
-    if (!results.keys.openai && process.env.OPENAI_API_KEY) {
-      results.keys.openai = { detected: true, masked: '••••' + process.env.OPENAI_API_KEY.slice(-6) };
-    }
   }
+
+  try {
+    const dashboardConfig = JSON.parse(fs.readFileSync(path.join(CONFIG_DIR, 'dashboard-config.json'), 'utf8'));
+    results.enabledFeatures = Array.isArray(dashboardConfig.features) ? dashboardConfig.features : [];
+  } catch {}
 
   res.json(results);
 });
@@ -3094,29 +3553,33 @@ app.post('/api/setup/validate', express.json(), async (req, res) => {
 // ── Settings API (post-setup config management) ────────────────────────
 // Helper: read/write .env as key-value pairs
 const ENV_PATH = path.join(CONFIG_DIR, '.env');
+const MANAGED_ENV_KEYS = [
+  'PORT', 'HOST', 'SESSION_SECRET',
+  'OPENCLAW_HOME', 'OPENCLAW_WORKSPACE', 'OPENCLAW_AGENT',
+  'ENABLED_FEATURES', 'ANTHROPIC_API_KEY', 'OPENROUTER_API_KEY', 'OPENAI_API_KEY',
+  'VIS_DB_HOST', 'VIS_DB_PORT', 'VIS_DB_USER', 'VIS_DB_PASS', 'VIS_DB_NAME',
+  'MAIL_IMAP', 'MAIL_ADDR', 'MAIL_PASS',
+  'SVC_DASHBOARD', 'SVC_TUNNEL', 'SVC_EXTRA',
+  'TUNNEL_ID', 'ARC_PUBLIC_URL', 'DASHBOARD_PUBLIC_URL'
+];
 function readEnvFile() {
   try {
-    const content = fs.readFileSync(ENV_PATH, 'utf8');
-    const env = {};
-    for (const line of content.split('\n')) {
-      if (!line.trim() || line.startsWith('#')) continue;
-      const eq = line.indexOf('=');
-      if (eq > 0) env[line.substring(0, eq)] = line.substring(eq + 1);
-    }
-    return env;
+    return dotenv.parse(fs.readFileSync(ENV_PATH, 'utf8'));
   } catch { return {}; }
 }
 
 function writeEnvFile(env) {
-  const envPath = ENV_PATH;
   const lines = [];
   for (const [key, val] of Object.entries(env)) {
-    if (val !== undefined && val !== null) lines.push(`${key}=${val}`);
+    if (val !== undefined && val !== null && val !== '') lines.push(`${key}=${serializeEnvValue(val)}`);
   }
-  fs.writeFileSync(envPath, lines.join('\n') + '\n');
-  // Reload in-process
-  for (const [key, val] of Object.entries(env)) {
-    if (val) process.env[key] = val;
+  fs.writeFileSync(ENV_PATH, lines.join('\n') + '\n');
+  for (const key of MANAGED_ENV_KEYS) {
+    if (Object.prototype.hasOwnProperty.call(env, key) && env[key] !== '' && env[key] != null) {
+      process.env[key] = sanitizeEnvValue(env[key]);
+    } else {
+      delete process.env[key];
+    }
   }
 }
 
@@ -3125,9 +3588,9 @@ app.post('/api/settings/keys', express.json(), requireAuth, (req, res) => {
   try {
     const env = readEnvFile();
     const { anthropic, openrouter, openai } = req.body || {};
-    if (anthropic) env.ANTHROPIC_API_KEY = anthropic;
-    if (openrouter) env.OPENROUTER_API_KEY = openrouter;
-    if (openai) env.OPENAI_API_KEY = openai;
+    env.ANTHROPIC_API_KEY = sanitizeEnvValue(anthropic);
+    env.OPENROUTER_API_KEY = sanitizeEnvValue(openrouter);
+    env.OPENAI_API_KEY = sanitizeEnvValue(openai);
     writeEnvFile(env);
     res.json({ ok: true });
   } catch (e) { res.json({ error: e.message }); }
@@ -3138,13 +3601,15 @@ app.post('/api/settings/general', express.json(), requireAuth, (req, res) => {
   try {
     const env = readEnvFile();
     const { openclawHome, agentName, svcDashboard, svcTunnel, svcExtra } = req.body || {};
-    if (openclawHome) { env.OPENCLAW_HOME = openclawHome; env.OPENCLAW_WORKSPACE = path.join(openclawHome, 'workspace'); }
-    if (agentName) env.OPENCLAW_AGENT = agentName;
-    if (svcDashboard) env.SVC_DASHBOARD = svcDashboard;
-    if (svcTunnel) env.SVC_TUNNEL = svcTunnel;
-    if (svcExtra !== undefined) env.SVC_EXTRA = svcExtra;
+    const home = sanitizeEnvValue(openclawHome, 1024);
+    env.OPENCLAW_HOME = home;
+    env.OPENCLAW_WORKSPACE = home ? path.join(home, 'workspace') : '';
+    env.OPENCLAW_AGENT = sanitizeEnvValue(agentName, 128);
+    env.SVC_DASHBOARD = sanitizeEnvValue(svcDashboard, 128);
+    env.SVC_TUNNEL = sanitizeEnvValue(svcTunnel, 128);
+    env.SVC_EXTRA = sanitizeEnvValue(svcExtra, 256);
     writeEnvFile(env);
-    res.json({ ok: true });
+    res.json({ ok: true, restart: true });
   } catch (e) { res.json({ error: e.message }); }
 });
 
@@ -3173,7 +3638,7 @@ app.post('/api/settings/features', express.json(), requireAuth, (req, res) => {
 app.post('/api/setup/save', express.json(), (req, res) => {
   const config = req.body;
   if (!config) return res.json({ error: 'No config provided' });
-  if (!config.adminPass || config.adminPass.length < 4) return res.json({ error: 'Password too short' });
+  if (!config.adminPass || config.adminPass.length < 8) return res.json({ error: 'Password must be at least 8 characters' });
 
   try {
     // Write auth config
@@ -3186,65 +3651,40 @@ app.post('/api/setup/save', express.json(), (req, res) => {
     };
     fs.writeFileSync(AUTH_CONFIG_PATH, JSON.stringify(authConfig, null, 2));
 
-    // Build .env content
-    const envLines = [
-      `PORT=${config.port || 3000}`,
-      `SESSION_SECRET=${require('crypto').randomBytes(32).toString('hex')}`,
-      `OPENCLAW_HOME=${config.openclawHome || ''}`,
-      `OPENCLAW_WORKSPACE=${config.openclawHome ? path.join(config.openclawHome, 'workspace') : ''}`,
-      `OPENCLAW_AGENT=${config.agentName || 'voice'}`,
-      '',
-      '# Features (comma-separated list of enabled features)',
-      `ENABLED_FEATURES=${['dashboard', 'costs', ...config.features].join(',')}`,
-      ''
-    ];
-
-    // API keys
-    if (config.keys) {
-      if (config.keys.anthropic) envLines.push(`ANTHROPIC_API_KEY=${config.keys.anthropic}`);
-      if (config.keys.openrouter) envLines.push(`OPENROUTER_API_KEY=${config.keys.openrouter}`);
-      if (config.keys.openai) envLines.push(`OPENAI_API_KEY=${config.keys.openai}`);
-      envLines.push('');
-    }
-
-    // VIS DB
-    if (config.features.includes('vis') && config.vis) {
-      envLines.push(`VIS_DB_HOST=${config.vis.host || ''}`);
-      envLines.push(`VIS_DB_PORT=${config.vis.port || 1433}`);
-      envLines.push(`VIS_DB_USER=${config.vis.user || ''}`);
-      envLines.push(`VIS_DB_PASS=${config.vis.pass || ''}`);
-      envLines.push(`VIS_DB_NAME=${config.vis.db || ''}`);
-      envLines.push('');
-    }
-
-    // Services
-    if (config.services) {
-      if (config.services.dashboard) envLines.push(`SVC_DASHBOARD=${config.services.dashboard}`);
-      if (config.services.tunnel) envLines.push(`SVC_TUNNEL=${config.services.tunnel}`);
-      if (config.services.extra) envLines.push(`SVC_EXTRA=${config.services.extra}`);
-    }
+    const selectedFeatures = Array.isArray(config.features) ? config.features.map(f => sanitizeEnvValue(f, 64)).filter(Boolean) : [];
+    const env = readEnvFile();
+    env.PORT = String(parseInt(config.port, 10) || 3000);
+    env.HOST = sanitizeEnvValue(config.host || process.env.HOST || '0.0.0.0', 128);
+    env.SESSION_SECRET = crypto.randomBytes(32).toString('hex');
+    env.OPENCLAW_HOME = sanitizeEnvValue(config.openclawHome, 1024);
+    env.OPENCLAW_WORKSPACE = env.OPENCLAW_HOME ? path.join(env.OPENCLAW_HOME, 'workspace') : '';
+    env.OPENCLAW_AGENT = sanitizeEnvValue(config.agentName || 'voice', 128);
+    env.ENABLED_FEATURES = ['dashboard', 'costs', ...selectedFeatures].join(',');
+    env.ANTHROPIC_API_KEY = sanitizeEnvValue(config.keys?.anthropic);
+    env.OPENROUTER_API_KEY = sanitizeEnvValue(config.keys?.openrouter);
+    env.OPENAI_API_KEY = sanitizeEnvValue(config.keys?.openai);
+    env.VIS_DB_HOST = selectedFeatures.includes('vis') ? sanitizeEnvValue(config.vis?.host, 256) : '';
+    env.VIS_DB_PORT = selectedFeatures.includes('vis') ? sanitizeEnvValue(config.vis?.port || 1433, 16) : '';
+    env.VIS_DB_USER = selectedFeatures.includes('vis') ? sanitizeEnvValue(config.vis?.user, 256) : '';
+    env.VIS_DB_PASS = selectedFeatures.includes('vis') ? sanitizeEnvValue(config.vis?.pass, 512) : '';
+    env.VIS_DB_NAME = selectedFeatures.includes('vis') ? sanitizeEnvValue(config.vis?.db, 256) : '';
+    env.MAIL_IMAP = selectedFeatures.includes('mail') ? sanitizeEnvValue(config.mail?.imap, 256) : '';
+    env.MAIL_ADDR = selectedFeatures.includes('mail') ? sanitizeEnvValue(config.mail?.addr, 256) : '';
+    env.MAIL_PASS = selectedFeatures.includes('mail') ? sanitizeEnvValue(config.mail?.pass, 512) : '';
+    env.SVC_DASHBOARD = sanitizeEnvValue(config.services?.dashboard, 128);
+    env.SVC_TUNNEL = sanitizeEnvValue(config.services?.tunnel, 128);
+    env.SVC_EXTRA = sanitizeEnvValue(config.services?.extra, 256);
 
     // Write dashboard config (features + non-secret settings)
     const dashConfig = {
-      features: config.features,
+      features: selectedFeatures,
       setupComplete: true,
       setupDate: new Date().toISOString()
     };
     fs.writeFileSync(path.join(configDir, 'dashboard-config.json'), JSON.stringify(dashConfig, null, 2));
 
-    // Write .env to user config directory (not npm package dir which may be root-owned)
-    const envPath = path.join(CONFIG_DIR, '.env');
-    fs.writeFileSync(envPath, envLines.join('\n') + '\n');
-
-    // Reload env vars in-process (no restart needed)
-    const envContent = require('dotenv').parse(fs.readFileSync(envPath));
-    for (const [key, val] of Object.entries(envContent)) {
-      process.env[key] = val;
-    }
-
-    // Auth config will be re-read on next request (getAuthConfig reads from disk)
-
-    res.json({ ok: true, restart: false });
+    writeEnvFile(env);
+    res.json({ ok: true, restart: true });
   } catch (e) {
     res.json({ error: e.message });
   }
@@ -3253,17 +3693,19 @@ app.post('/api/setup/save', express.json(), (req, res) => {
 // POST /api/setup/install — install optional dependencies
 app.post('/api/setup/install', express.json(), (req, res) => {
   const { features = [], openclawHome } = req.body || {};
+  const selectedFeatures = Array.isArray(features) ? features.filter(f => ['neural', 'mail', 'github', 'vis', 'tunnel', 'ollama'].includes(f)) : [];
   const steps = [];
+  const safeOpenclawHome = openclawHome ? path.resolve(String(openclawHome)) : '';
 
-  for (const feat of features) {
+  for (const feat of selectedFeatures) {
     if (feat === 'neural') {
       // Install neural-memory
       try {
-        execSync('which nmem 2>/dev/null');
+        requireCommandOutput('which', ['nmem']);
         steps.push({ ok: true, message: 'nmem already installed' });
       } catch {
         try {
-          execSync('pip install neural-memory 2>&1', { timeout: 120000 });
+          requireCommandOutput('pip', ['install', 'neural-memory'], { timeout: 120000 });
           steps.push({ ok: true, message: 'neural-memory installed via pip' });
         } catch (e) {
           steps.push({ ok: false, message: 'Failed to install neural-memory: ' + e.message.substring(0, 200) });
@@ -3275,7 +3717,7 @@ app.post('/api/setup/install', express.json(), (req, res) => {
       const neuralDir = path.resolve(os.homedir(), '.neuralmemory');
       if (!fs.existsSync(path.join(neuralDir, 'brains', 'default.db'))) {
         try {
-          execSync('nmem init 2>&1', { timeout: 30000 });
+          requireCommandOutput('nmem', ['init'], { timeout: 30000 });
           steps.push({ ok: true, message: 'nmem initialized' });
         } catch (e) {
           steps.push({ ok: false, message: 'nmem init failed: ' + e.message.substring(0, 200) });
@@ -3283,16 +3725,16 @@ app.post('/api/setup/install', express.json(), (req, res) => {
       }
 
       // Train if workspace exists
-      if (openclawHome) {
-        const workspace = path.join(openclawHome, 'workspace');
+      if (safeOpenclawHome) {
+        const workspace = path.join(safeOpenclawHome, 'workspace');
         const memoryDir = path.join(workspace, 'memory');
         const memoryMd = path.join(workspace, 'MEMORY.md');
-        const sources = [];
-        if (fs.existsSync(memoryDir)) sources.push('--source ' + memoryDir);
-        if (fs.existsSync(memoryMd)) sources.push('--source ' + memoryMd);
-        if (sources.length) {
+        const args = ['train'];
+        if (fs.existsSync(memoryDir)) args.push('--source', memoryDir);
+        if (fs.existsSync(memoryMd)) args.push('--source', memoryMd);
+        if (args.length > 1) {
           try {
-            execSync(`nmem train ${sources.join(' ')} 2>&1`, { timeout: 300000 });
+            requireCommandOutput('nmem', args, { timeout: 300000 });
             steps.push({ ok: true, message: 'nmem trained on workspace memory' });
           } catch (e) {
             steps.push({ ok: false, message: 'nmem train failed (non-critical): ' + e.message.substring(0, 200) });
@@ -3302,10 +3744,18 @@ app.post('/api/setup/install', express.json(), (req, res) => {
 
       // Set up cron
       try {
-        const cronLine = `0 */4 * * * nmem train --source ${openclawHome}/workspace/memory/ --source ${openclawHome}/workspace/MEMORY.md >> /var/log/nmem-train.log 2>&1`;
-        const existing = execSync('crontab -l 2>/dev/null || true', { encoding: 'utf8' });
+        const sources = [];
+        if (safeOpenclawHome) {
+          sources.push('--source', path.join(safeOpenclawHome, 'workspace', 'memory'));
+          sources.push('--source', path.join(safeOpenclawHome, 'workspace', 'MEMORY.md'));
+        }
+        const cronLine = `0 */4 * * * ${['nmem', 'train', ...sources].map(part => String(part).replace(/ /g, '\\ ')).join(' ')} >> /var/log/nmem-train.log 2>&1`;
+        const currentCrontab = runCommand('crontab', ['-l'], { timeout: 5000 });
+        const existing = currentCrontab.ok ? currentCrontab.stdout : '';
         if (!existing.includes('nmem train')) {
-          execSync(`(crontab -l 2>/dev/null || true; echo "${cronLine}") | crontab -`);
+          const nextCrontab = (existing ? existing + '\n' : '') + cronLine + '\n';
+          const installResult = spawnSync('crontab', ['-'], { input: nextCrontab, encoding: 'utf8', timeout: 5000 });
+          if (installResult.status !== 0) throw new Error(String(installResult.stderr || installResult.stdout || 'crontab failed'));
           steps.push({ ok: true, message: 'nmem 4-hour cron job added' });
         } else {
           steps.push({ ok: true, message: 'nmem cron already configured' });
@@ -3317,7 +3767,7 @@ app.post('/api/setup/install', express.json(), (req, res) => {
 
     if (feat === 'mail') {
       try {
-        execSync('which himalaya 2>/dev/null');
+        requireCommandOutput('which', ['himalaya']);
         steps.push({ ok: true, message: 'himalaya CLI already installed' });
       } catch {
         steps.push({ ok: false, message: 'himalaya not found — install manually: cargo install himalaya' });
@@ -3326,9 +3776,10 @@ app.post('/api/setup/install', express.json(), (req, res) => {
 
     if (feat === 'github') {
       try {
-        execSync('which gh 2>/dev/null');
-        const authStatus = execSync('gh auth status 2>&1 || true', { encoding: 'utf8' });
-        if (authStatus.includes('Logged in')) {
+        requireCommandOutput('which', ['gh']);
+        const authStatus = runCommand('gh', ['auth', 'status'], { timeout: 10000 });
+        const statusText = authStatus.stdout || authStatus.stderr;
+        if (statusText.includes('Logged in')) {
           steps.push({ ok: true, message: 'gh CLI authenticated' });
         } else {
           steps.push({ ok: false, message: 'gh CLI installed but not authenticated — run: gh auth login' });
@@ -3357,8 +3808,8 @@ app.get('/api/setup/health', (req, res) => {
   } catch { checks.push({ name: 'OpenClaw Process', status: 'error', detail: 'Check failed' }); }
 
   // Session directory — use env var (may have been updated by setup/save)
-  const currentHome = process.env.OPENCLAW_HOME || OPENCLAW_HOME;
-  const currentAgent = process.env.OPENCLAW_AGENT || AGENT_NAME;
+  const currentHome = process.env.OPENCLAW_HOME || getOpenClawHome();
+  const currentAgent = process.env.OPENCLAW_AGENT || getAgentName();
   const sessDir = path.join(currentHome, 'agents', currentAgent, 'sessions');
   checks.push({
     name: 'Session Directory',
@@ -3367,7 +3818,7 @@ app.get('/api/setup/health', (req, res) => {
   });
 
   // Workspace
-  const currentWorkspace = process.env.OPENCLAW_WORKSPACE || WORKSPACE;
+  const currentWorkspace = process.env.OPENCLAW_WORKSPACE || getWorkspace();
   checks.push({
     name: 'Workspace',
     status: fs.existsSync(currentWorkspace) ? 'ok' : 'error',
@@ -3429,9 +3880,7 @@ app.get('/setup', (req, res) => {
 // GET /api/live/sessions — list all sessions from sessions.json
 app.get('/api/live/sessions', requireAuth, (req, res) => {
   try {
-    const OPENCLAW_HOME = process.env.OPENCLAW_HOME || path.resolve(os.homedir(), '.openclaw');
-    const AGENT = process.env.OPENCLAW_AGENT || 'voice';
-    const sjPath = path.join(OPENCLAW_HOME, 'agents', AGENT, 'sessions', 'sessions.json');
+    const sjPath = path.join(getSessionsDir(), 'sessions.json');
     const data = JSON.parse(fs.readFileSync(sjPath, 'utf8'));
     const sessions = Object.entries(data).map(([key, val]) => ({
       key,
@@ -3448,12 +3897,10 @@ app.get('/api/live/sessions', requireAuth, (req, res) => {
 // GET /api/live/session?key=...&limit=100 — read session log
 app.get('/api/live/session', requireAuth, (req, res) => {
   try {
-    const OPENCLAW_HOME = process.env.OPENCLAW_HOME || path.resolve(os.homedir(), '.openclaw');
-    const AGENT = process.env.OPENCLAW_AGENT || 'voice';
-    const sjPath = path.join(OPENCLAW_HOME, 'agents', AGENT, 'sessions', 'sessions.json');
+    const sjPath = path.join(getSessionsDir(), 'sessions.json');
     const data = JSON.parse(fs.readFileSync(sjPath, 'utf8'));
     const key = req.query.key;
-    const limit = parseInt(req.query.limit) || 100;
+    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 100, 1), 500);
     if (!key || !data[key]) return res.json({ error: 'Session not found' });
     const entry = data[key];
     const logFile = entry.sessionFile;
@@ -3508,6 +3955,61 @@ app.get('/api/settings/alerts', requireAuth, (req, res) => {
   } catch { res.json({}); }
 });
 
+app.get('/api/alerts/recent', requireAuth, (req, res) => {
+  const configPath = path.join(CONFIG_DIR, 'alerts-config.json');
+  let config = {};
+  try { config = JSON.parse(fs.readFileSync(configPath, 'utf8')); } catch {}
+
+  const items = [];
+  const nowIso = new Date().toISOString();
+  const types = config.types || {};
+
+  if (types.budget) {
+    const budgetLimit = parseFloat(config.budgetLimit);
+    const summary = cache.get('costs_summary');
+    if (summary && Number.isFinite(budgetLimit) && budgetLimit > 0 && (summary.totalToday || 0) >= budgetLimit) {
+      items.push({ level: 'error', title: 'Daily budget exceeded', detail: `Today: $${(summary.totalToday || 0).toFixed(4)} / $${budgetLimit.toFixed(2)}`, timestamp: nowIso });
+    }
+  }
+
+  if (types.errors) {
+    const threshold = parseInt(config.errorThreshold, 10) || 0;
+    const orch = cache.get('orch_sessions');
+    if (orch && threshold > 0) {
+      const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+      const recentErrors = (orch.sessions || []).filter(s => s.hasError && s.startTime && new Date(s.startTime).getTime() >= cutoff);
+      if (recentErrors.length >= threshold) {
+        items.push({ level: 'error', title: 'Error threshold exceeded', detail: `${recentErrors.length} failed sessions in the last 24 hours`, timestamp: nowIso });
+      }
+    }
+  }
+
+  if (types.disk) {
+    const diskThreshold = parseInt(config.diskThreshold, 10) || 0;
+    const df = exec("df -P / | tail -1 | awk '{print $5}'", '0%').replace('%', '');
+    const pct = parseInt(df, 10) || 0;
+    if (diskThreshold > 0 && pct >= diskThreshold) {
+      items.push({ level: pct >= 90 ? 'error' : 'warn', title: 'Disk usage high', detail: `${pct}% used on /`, timestamp: nowIso });
+    }
+  }
+
+  if (types.offline) {
+    const oclawPid = exec("pgrep -f 'openclaw.*gateway' | head -1", '');
+    if (!oclawPid) {
+      items.push({ level: 'error', title: 'OpenClaw process offline', detail: 'Gateway process was not detected', timestamp: nowIso });
+    }
+  }
+
+  if (types.channel) {
+    const tunnelState = exec(`systemctl show ${getServiceName('tunnel')} --property=ActiveState --value 2>/dev/null`, 'unknown').trim();
+    if (tunnelState && tunnelState !== 'active') {
+      items.push({ level: 'warn', title: 'Tunnel not active', detail: `Tunnel service state: ${tunnelState}`, timestamp: nowIso });
+    }
+  }
+
+  res.json({ items });
+});
+
 app.post('/api/settings/alerts', express.json(), requireAuth, (req, res) => {
   try {
     const configDir = CONFIG_DIR;
@@ -3520,21 +4022,18 @@ app.post('/api/settings/alerts', express.json(), requireAuth, (req, res) => {
 // POST /api/workspace/file — save file content
 app.post('/api/workspace/file', express.json({ limit: '1mb' }), requireAuth, (req, res) => {
   const { path: relPath, content } = req.body || {};
-  if (!relPath || relPath.startsWith('/') || relPath.includes('..')) {
-    return res.status(400).json({ error: 'Invalid path' });
-  }
   const allowed = ['.md', '.txt', '.json', '.yml', '.yaml', '.toml', '.sh', '.js', '.py'];
   const ext = path.extname(relPath).toLowerCase();
   if (!allowed.includes(ext)) {
     return res.status(403).json({ error: 'File type not editable' });
   }
-  const abs = path.join(WORKSPACE, relPath);
   try {
+    const abs = resolveWorkspacePath(relPath, { allowMissing: true });
     const dir = path.dirname(abs);
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(abs, content, 'utf8');
     const stat = fs.statSync(abs);
-    cache.clear(); // Invalidate workspace cache
+    invalidateWorkspaceCaches();
     res.json({ ok: true, path: relPath, size: stat.size, mtime: stat.mtime.toISOString() });
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -3572,8 +4071,10 @@ function gracefulShutdown(signal) {
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`🤖 Clawdbot Dashboard running on http://0.0.0.0:${PORT}`);
+const PORT = getDashboardPort();
+const HOST = getDashboardHost();
+app.listen(PORT, HOST, () => {
+  console.log(`🤖 Clawdbot Dashboard running on http://${HOST}:${PORT}`);
   console.log(`🌐 ARC website routing: arc.net.pk → ${ARC_SITE}`);
 });
 
