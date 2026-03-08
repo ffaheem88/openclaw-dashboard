@@ -3093,10 +3093,10 @@ app.post('/api/setup/validate', express.json(), async (req, res) => {
 
 // ── Settings API (post-setup config management) ────────────────────────
 // Helper: read/write .env as key-value pairs
+const ENV_PATH = path.join(CONFIG_DIR, '..', '.env');
 function readEnvFile() {
   try {
-    const envPath = path.join(__dirname, '.env');
-    const content = fs.readFileSync(envPath, 'utf8');
+    const content = fs.readFileSync(ENV_PATH, 'utf8');
     const env = {};
     for (const line of content.split('\n')) {
       if (!line.trim() || line.startsWith('#')) continue;
@@ -3108,7 +3108,7 @@ function readEnvFile() {
 }
 
 function writeEnvFile(env) {
-  const envPath = path.join(__dirname, '.env');
+  const envPath = ENV_PATH;
   const lines = [];
   for (const [key, val] of Object.entries(env)) {
     if (val !== undefined && val !== null) lines.push(`${key}=${val}`);
