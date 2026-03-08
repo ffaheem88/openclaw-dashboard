@@ -3986,18 +3986,29 @@ app.get('/api/live/session', requireAuth, (req, res) => {
           const role = msg.role;
           // Only show user and assistant messages
           if (role !== 'user' && role !== 'assistant') continue;
-          // Extract text content
-          let text = '';
+          // Extract text content, filtering out metadata and noise
+          let textParts = [];
           if (typeof msg.content === 'string') {
-            text = msg.content;
+            textParts = [msg.content];
           } else if (Array.isArray(msg.content)) {
-            text = msg.content.filter(c => c.type === 'text').map(c => c.text || '').join('\n');
+            textParts = msg.content
+              .filter(c => c.type === 'text' && c.text)
+              .map(c => c.text);
           }
+          // Filter out metadata blocks, NO_REPLY, etc from each part
+          textParts = textParts.filter(t => {
+            const trimmed = t.trim();
+            if (trimmed === 'NO_REPLY' || trimmed === 'HEARTBEAT_OK') return false;
+            if (trimmed.startsWith('Conversation info (untrusted metadata)')) return false;
+            if (trimmed.startsWith('Sender (untrusted metadata)')) return false;
+            if (trimmed.includes('"schema": "openclaw.inbound_meta')) return false;
+            if (trimmed.startsWith('[Queued messages while agent was busy]')) return false;
+            if (/^\[media attached:/.test(trimmed)) return false;
+            if (trimmed.startsWith('To send an image back, prefer the message tool')) return false;
+            return true;
+          });
+          const text = textParts.join('\n').trim();
           if (!text) continue;
-          // Filter out NO_REPLY, HEARTBEAT_OK, and raw metadata blocks
-          if (text.trim() === 'NO_REPLY' || text.trim() === 'HEARTBEAT_OK') continue;
-          // Filter out conversation_info JSON metadata blocks
-          if (text.includes('"schema": "openclaw.inbound_meta') || text.startsWith('Conversation info (untrusted metadata)')) continue;
           messages.push({
             type: 'message',
             role,
