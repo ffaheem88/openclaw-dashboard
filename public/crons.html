@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cron & Heartbeat Manager — OpenClaw Dashboard</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+    :root{
+      --bg:#0a0e17;--bg2:#0f1420;--glass:rgba(255,255,255,.03);
+      --border:rgba(255,255,255,.08);--highlight:rgba(255,255,255,.12);
+      --text:#f1f5f9;--text2:#94a3b8;--muted:#64748b;
+      --cyan:#06b6d4;--purple:#8b5cf6;--green:#10b981;--amber:#f59e0b;--red:#f43f5e;
+      --gradient:linear-gradient(135deg,#06b6d4 0%,#8b5cf6 50%,#ec4899 100%);
+    }
+    body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);font-size:14px;min-height:100vh;display:flex;flex-direction:column}
+    .topbar{background:var(--bg2);border-bottom:1px solid var(--border);padding:12px 24px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
+    .topbar h1{font-size:18px;font-weight:700;background:var(--gradient);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+    .topbar .nav{display:flex;gap:12px;align-items:center}
+    .topbar .nav a{color:var(--text2);text-decoration:none;font-size:13px;padding:6px 12px;border-radius:6px;transition:all .2s}
+    .topbar .nav a:hover,.topbar .nav a.active{background:var(--glass);color:var(--text)}
+    .main{flex:1;overflow-y:auto;padding:24px}
+    .tabs{display:flex;gap:8px;margin-bottom:24px;border-bottom:1px solid var(--border);padding-bottom:12px}
+    .tab{padding:8px 16px;border-radius:6px;cursor:pointer;font-size:13px;color:var(--text2);transition:all .2s;border:none;background:none;font-family:inherit}
+    .tab:hover{color:var(--text);background:var(--glass)}
+    .tab.active{color:var(--cyan);background:rgba(6,182,212,.1)}
+    .card{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:16px;transition:all .2s}
+    .card:hover{border-color:var(--highlight)}
+    .card-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+    .card-title{font-size:16px;font-weight:600;display:flex;align-items:center;gap:10px}
+    .card-title .emoji{font-size:20px}
+    .badge{padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px}
+    .badge-green{background:rgba(16,185,129,.15);color:var(--green)}
+    .badge-red{background:rgba(244,63,94,.15);color:var(--red)}
+    .badge-amber{background:rgba(245,158,11,.15);color:var(--amber)}
+    .badge-muted{background:var(--glass);color:var(--muted)}
+    .meta{display:flex;flex-wrap:wrap;gap:16px;font-size:12px;color:var(--text2);margin-bottom:12px}
+    .meta-item{display:flex;align-items:center;gap:4px}
+    .run-dots{display:flex;gap:4px;align-items:center}
+    .run-dot{width:10px;height:10px;border-radius:50%;border:1px solid var(--border)}
+    .run-dot.ok{background:var(--green);border-color:var(--green)}
+    .run-dot.error{background:var(--red);border-color:var(--red)}
+    .run-dot.unknown{background:var(--muted);border-color:var(--muted)}
+    .actions{display:flex;gap:8px;flex-wrap:wrap}
+    .btn{padding:6px 14px;border-radius:6px;font-size:12px;font-weight:500;cursor:pointer;border:1px solid var(--border);background:var(--glass);color:var(--text2);transition:all .2s;font-family:inherit;display:inline-flex;align-items:center;gap:6px}
+    .btn:hover{background:var(--highlight);color:var(--text)}
+    .btn-cyan{border-color:rgba(6,182,212,.3);color:var(--cyan)}
+    .btn-cyan:hover{background:rgba(6,182,212,.15)}
+    .btn-green{border-color:rgba(16,185,129,.3);color:var(--green)}
+    .btn-green:hover{background:rgba(16,185,129,.15)}
+    .btn-red{border-color:rgba(244,63,94,.3);color:var(--red)}
+    .btn-red:hover{background:rgba(244,63,94,.15)}
+    .btn-amber{border-color:rgba(245,158,11,.3);color:var(--amber)}
+    .btn-amber:hover{background:rgba(245,158,11,.15)}
+    .btn-primary{background:rgba(6,182,212,.15);border-color:var(--cyan);color:var(--cyan)}
+    .btn-primary:hover{background:rgba(6,182,212,.25)}
+    .task-preview{background:var(--glass);border:1px solid var(--border);border-radius:8px;padding:12px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text2);max-height:120px;overflow-y:auto;white-space:pre-wrap;word-break:break-all;margin-top:8px}
+    .countdown{font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--cyan);font-weight:500}
+    .section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+    .section-title{font-size:20px;font-weight:700;display:flex;align-items:center;gap:10px}
+    .empty{text-align:center;padding:60px 20px;color:var(--muted)}
+    .empty .emoji{font-size:48px;margin-bottom:12px}
+
+    /* Modal */
+    .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:200;display:none;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
+    .modal-overlay.open{display:flex}
+    .modal{background:var(--bg2);border:1px solid var(--border);border-radius:16px;width:90%;max-width:600px;max-height:80vh;overflow-y:auto;padding:24px}
+    .modal h2{font-size:18px;font-weight:700;margin-bottom:20px;display:flex;align-items:center;gap:8px}
+    .form-group{margin-bottom:16px}
+    .form-group label{display:block;font-size:12px;color:var(--text2);margin-bottom:6px;font-weight:500;text-transform:uppercase;letter-spacing:.5px}
+    .form-group input,.form-group select,.form-group textarea{width:100%;padding:10px 14px;background:var(--glass);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;font-family:inherit;outline:none;transition:border .2s}
+    .form-group input:focus,.form-group select:focus,.form-group textarea:focus{border-color:var(--cyan)}
+    .form-group textarea{min-height:100px;font-family:'JetBrains Mono',monospace;resize:vertical}
+    .form-row{display:flex;gap:12px}
+    .form-row .form-group{flex:1}
+    .form-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:20px;padding-top:16px;border-top:1px solid var(--border)}
+
+    /* Run history */
+    .runs-table{width:100%;border-collapse:collapse;font-size:12px;margin-top:12px}
+    .runs-table th{text-align:left;padding:8px 12px;color:var(--muted);font-weight:500;border-bottom:1px solid var(--border);text-transform:uppercase;letter-spacing:.5px;font-size:11px}
+    .runs-table td{padding:8px 12px;border-bottom:1px solid var(--glass);color:var(--text2)}
+    .runs-table tr:hover td{background:var(--glass)}
+
+    /* Heartbeat editor */
+    .heartbeat-editor{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:20px}
+    .heartbeat-editor textarea{width:100%;min-height:300px;background:var(--glass);border:1px solid var(--border);border-radius:8px;padding:16px;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:13px;line-height:1.6;resize:vertical;outline:none}
+    .heartbeat-editor textarea:focus{border-color:var(--cyan)}
+
+    .toast{position:fixed;bottom:24px;right:24px;padding:12px 20px;border-radius:8px;font-size:13px;z-index:300;animation:slideIn .3s ease}
+    .toast-ok{background:rgba(16,185,129,.2);border:1px solid var(--green);color:var(--green)}
+    .toast-err{background:rgba(244,63,94,.2);border:1px solid var(--red);color:var(--red)}
+    @keyframes slideIn{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}}
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <h1>⏰ Cron & Heartbeat Manager</h1>
+    <div class="nav">
+      <a href="/">Dashboard</a>
+      <a href="/agents.html">Agents</a>
+      <a href="/neural.html">Neural</a>
+      <a href="/files.html">Files</a>
+      <a href="/crons.html" class="active">Crons</a>
+      <a href="/settings.html">Settings</a>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab('crons')">⏰ Cron Jobs</button>
+      <button class="tab" onclick="switchTab('heartbeat')">💓 Heartbeat</button>
+      <button class="tab" onclick="switchTab('history')">📜 Run History</button>
+    </div>
+
+    <!-- Cron Jobs Tab -->
+    <div id="tab-crons">
+      <div class="section-header">
+        <div class="section-title">⏰ Cron Jobs</div>
+        <button class="btn btn-primary" onclick="openCreateModal()">+ New Cron Job</button>
+      </div>
+      <div id="cron-list"><div class="empty"><div class="emoji">⏳</div>Loading cron jobs...</div></div>
+    </div>
+
+    <!-- Heartbeat Tab -->
+    <div id="tab-heartbeat" style="display:none">
+      <div class="section-header">
+        <div class="section-title">💓 Heartbeat Config</div>
+        <button class="btn btn-green" onclick="saveHeartbeat()">💾 Save</button>
+      </div>
+      <p style="color:var(--text2);margin-bottom:16px;font-size:13px">Edit HEARTBEAT.md — this controls what your agent checks during heartbeat polls.</p>
+      <div class="heartbeat-editor">
+        <textarea id="heartbeat-content" spellcheck="false">Loading...</textarea>
+      </div>
+    </div>
+
+    <!-- Run History Tab -->
+    <div id="tab-history" style="display:none">
+      <div class="section-header">
+        <div class="section-title">📜 Run History</div>
+        <div style="display:flex;gap:8px">
+          <select id="history-filter" class="btn" onchange="loadHistory()">
+            <option value="all">All Jobs</option>
+          </select>
+          <select id="history-status" class="btn" onchange="loadHistory()">
+            <option value="all">All Status</option>
+            <option value="ok">✅ Success</option>
+            <option value="error">❌ Errors</option>
+          </select>
+        </div>
+      </div>
+      <div id="history-table"></div>
+    </div>
+  </div>
+
+  <!-- Create/Edit Modal -->
+  <div class="modal-overlay" id="modal">
+    <div class="modal">
+      <h2 id="modal-title">⏰ New Cron Job</h2>
+      <input type="hidden" id="edit-id">
+      <div class="form-group">
+        <label>Name</label>
+        <input type="text" id="cron-name" placeholder="my-daily-task">
+      </div>
+      <div class="form-group">
+        <label>Description</label>
+        <input type="text" id="cron-desc" placeholder="What does this job do?">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Schedule (cron expression)</label>
+          <input type="text" id="cron-expr" placeholder="0 9 * * *">
+        </div>
+        <div class="form-group">
+          <label>Timezone</label>
+          <input type="text" id="cron-tz" placeholder="Asia/Karachi" value="Asia/Karachi">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Model</label>
+          <input type="text" id="cron-model" placeholder="sonnet">
+        </div>
+        <div class="form-group">
+          <label>Timeout (seconds)</label>
+          <input type="number" id="cron-timeout" placeholder="180" value="180">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Task Message</label>
+        <textarea id="cron-message" placeholder="What should the agent do?"></textarea>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Delivery Channel</label>
+          <select id="cron-channel">
+            <option value="">None</option>
+            <option value="whatsapp">WhatsApp</option>
+            <option value="telegram">Telegram</option>
+            <option value="msteams">MS Teams</option>
+            <option value="discord">Discord</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Deliver To (chat ID / number)</label>
+          <input type="text" id="cron-to" placeholder="+923218222470">
+        </div>
+      </div>
+      <div class="form-actions">
+        <button class="btn" onclick="closeModal()">Cancel</button>
+        <button class="btn btn-primary" onclick="saveCron()">💾 Save</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let allJobs = [];
+    let allRuns = [];
+
+    // Tab switching
+    function switchTab(tab) {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('[id^="tab-"]').forEach(t => t.style.display = 'none');
+      event.target.classList.add('active');
+      document.getElementById('tab-' + tab).style.display = 'block';
+      if (tab === 'heartbeat') loadHeartbeat();
+      if (tab === 'history') loadHistory();
+    }
+
+    // Toast notifications
+    function toast(msg, ok = true) {
+      const t = document.createElement('div');
+      t.className = 'toast ' + (ok ? 'toast-ok' : 'toast-err');
+      t.textContent = msg;
+      document.body.appendChild(t);
+      setTimeout(() => t.remove(), 3000);
+    }
+
+    // Format relative time
+    function relTime(ms) {
+      if (!ms || ms <= 0) return '—';
+      const s = Math.floor(ms / 1000);
+      if (s < 60) return s + 's';
+      const m = Math.floor(s / 60);
+      if (m < 60) return m + 'm';
+      const h = Math.floor(m / 60);
+      if (h < 24) return h + 'h ' + (m % 60) + 'm';
+      const d = Math.floor(h / 24);
+      return d + 'd ' + (h % 24) + 'h';
+    }
+
+    // Format countdown to next run
+    function countdown(nextMs) {
+      if (!nextMs) return '—';
+      const diff = nextMs - Date.now();
+      if (diff <= 0) return 'Imminent';
+      return relTime(diff);
+    }
+
+    // Cron expression to human-readable
+    function cronHuman(expr) {
+      const parts = (expr || '').split(' ');
+      if (parts.length < 5) return expr;
+      const [min, hr, dom, mon, dow] = parts;
+      if (dom === '*' && mon === '*' && dow === '*') return `Daily at ${hr.padStart(2,'0')}:${min.padStart(2,'0')}`;
+      if (dom === '*' && mon === '*' && dow !== '*') {
+        const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+        return `${days[dow] || dow} at ${hr.padStart(2,'0')}:${min.padStart(2,'0')}`;
+      }
+      return expr;
+    }
+
+    // Load cron jobs
+    async function loadCrons() {
+      try {
+        const res = await fetch('/api/orchestration/crons');
+        const data = await res.json();
+        allJobs = data.jobs || [];
+        allRuns = data.cronRuns || [];
+        renderCrons();
+        populateHistoryFilter();
+      } catch (e) {
+        document.getElementById('cron-list').innerHTML = '<div class="empty"><div class="emoji">❌</div>Failed to load cron jobs</div>';
+      }
+    }
+
+    function renderCrons() {
+      const el = document.getElementById('cron-list');
+      if (!allJobs.length) {
+        el.innerHTML = '<div class="empty"><div class="emoji">📭</div>No cron jobs configured<br><br><button class="btn btn-primary" onclick="openCreateModal()">+ Create your first cron job</button></div>';
+        return;
+      }
+      el.innerHTML = allJobs.map(j => {
+        const state = j.state || {};
+        const enabled = j.enabled !== false;
+        const statusBadge = !enabled ? '<span class="badge badge-muted">DISABLED</span>' :
+          state.lastRunStatus === 'ok' ? '<span class="badge badge-green">OK</span>' :
+          state.lastRunStatus === 'error' ? '<span class="badge badge-red">ERROR</span>' :
+          '<span class="badge badge-muted">PENDING</span>';
+        const dots = (j.recentRuns || []).map(r => `<div class="run-dot ${r.status}" title="${r.timestamp || ''}"></div>`).join('');
+        const schedule = j.schedule || {};
+        const payload = j.payload || {};
+        const delivery = j.delivery || {};
+        const taskPreview = (payload.message || '').substring(0, 200) + ((payload.message||'').length > 200 ? '...' : '');
+        return `<div class="card">
+          <div class="card-header">
+            <div class="card-title">
+              <span class="emoji">⏰</span>
+              <span>${j.name || j.id}</span>
+              ${statusBadge}
+            </div>
+            <div class="countdown" title="Next run">⏳ ${countdown(state.nextRunAtMs)}</div>
+          </div>
+          ${j.description ? `<div style="color:var(--text2);font-size:13px;margin-bottom:8px">${j.description}</div>` : ''}
+          <div class="meta">
+            <div class="meta-item">📅 ${cronHuman(schedule.expr)} (${schedule.tz || 'UTC'})</div>
+            <div class="meta-item">🤖 ${payload.model || 'default'}</div>
+            ${delivery.channel ? `<div class="meta-item">📨 ${delivery.channel} → ${delivery.to || '—'}</div>` : ''}
+            ${state.lastDurationMs ? `<div class="meta-item">⏱️ Last: ${relTime(state.lastDurationMs)}</div>` : ''}
+            ${state.consecutiveErrors > 0 ? `<div class="meta-item" style="color:var(--red)">⚠️ ${state.consecutiveErrors} consecutive errors</div>` : ''}
+          </div>
+          ${dots ? `<div style="margin-bottom:8px"><span style="font-size:11px;color:var(--muted)">Recent runs: </span><div class="run-dots" style="display:inline-flex">${dots}</div></div>` : ''}
+          <div class="task-preview">${escHtml(taskPreview)}</div>
+          <div class="actions" style="margin-top:12px">
+            <button class="btn btn-cyan" onclick="runNow('${j.id}')">▶️ Run Now</button>
+            <button class="btn ${enabled ? 'btn-amber' : 'btn-green'}" onclick="toggleCron('${j.id}', ${!enabled})">${enabled ? '⏸️ Disable' : '▶️ Enable'}</button>
+            <button class="btn" onclick="editCron('${j.id}')">✏️ Edit</button>
+            <button class="btn btn-red" onclick="deleteCron('${j.id}', '${escHtml(j.name || j.id)}')">🗑️ Delete</button>
+          </div>
+        </div>`;
+      }).join('');
+    }
+
+    function escHtml(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+    // Modal operations
+    function openCreateModal() {
+      document.getElementById('modal-title').textContent = '⏰ New Cron Job';
+      document.getElementById('edit-id').value = '';
+      document.getElementById('cron-name').value = '';
+      document.getElementById('cron-desc').value = '';
+      document.getElementById('cron-expr').value = '';
+      document.getElementById('cron-tz').value = 'Asia/Karachi';
+      document.getElementById('cron-model').value = 'sonnet';
+      document.getElementById('cron-timeout').value = '180';
+      document.getElementById('cron-message').value = '';
+      document.getElementById('cron-channel').value = '';
+      document.getElementById('cron-to').value = '';
+      document.getElementById('modal').classList.add('open');
+    }
+
+    function editCron(id) {
+      const job = allJobs.find(j => j.id === id);
+      if (!job) return;
+      document.getElementById('modal-title').textContent = '✏️ Edit Cron Job';
+      document.getElementById('edit-id').value = id;
+      document.getElementById('cron-name').value = job.name || '';
+      document.getElementById('cron-desc').value = job.description || '';
+      document.getElementById('cron-expr').value = (job.schedule || {}).expr || '';
+      document.getElementById('cron-tz').value = (job.schedule || {}).tz || 'UTC';
+      document.getElementById('cron-model').value = (job.payload || {}).model || '';
+      document.getElementById('cron-timeout').value = (job.payload || {}).timeoutSeconds || 180;
+      document.getElementById('cron-message').value = (job.payload || {}).message || '';
+      document.getElementById('cron-channel').value = (job.delivery || {}).channel || '';
+      document.getElementById('cron-to').value = (job.delivery || {}).to || '';
+      document.getElementById('modal').classList.add('open');
+    }
+
+    function closeModal() { document.getElementById('modal').classList.remove('open'); }
+
+    async function saveCron() {
+      const editId = document.getElementById('edit-id').value;
+      const body = {
+        name: document.getElementById('cron-name').value,
+        description: document.getElementById('cron-desc').value,
+        schedule: document.getElementById('cron-expr').value,
+        tz: document.getElementById('cron-tz').value,
+        model: document.getElementById('cron-model').value,
+        timeout: parseInt(document.getElementById('cron-timeout').value) || 180,
+        message: document.getElementById('cron-message').value,
+        channel: document.getElementById('cron-channel').value,
+        to: document.getElementById('cron-to').value
+      };
+      try {
+        const url = editId ? `/api/crons/${editId}` : '/api/crons';
+        const method = editId ? 'PUT' : 'POST';
+        const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+        const data = await res.json();
+        if (data.error) throw new Error(data.error);
+        toast(editId ? 'Cron job updated!' : 'Cron job created!');
+        closeModal();
+        setTimeout(loadCrons, 1000);
+      } catch (e) { toast('Failed: ' + e.message, false); }
+    }
+
+    async function toggleCron(id, enable) {
+      try {
+        const res = await fetch(`/api/crons/${id}/${enable ? 'enable' : 'disable'}`, { method: 'POST' });
+        const data = await res.json();
+        if (data.error) throw new Error(data.error);
+        toast(enable ? 'Cron enabled' : 'Cron disabled');
+        setTimeout(loadCrons, 1000);
+      } catch (e) { toast('Failed: ' + e.message, false); }
+    }
+
+    async function runNow(id) {
+      try {
+        const res = await fetch(`/api/crons/${id}/run`, { method: 'POST' });
+        const data = await res.json();
+        if (data.error) throw new Error(data.error);
+        toast('Cron job triggered!');
+      } catch (e) { toast('Failed: ' + e.message, false); }
+    }
+
+    async function deleteCron(id, name) {
+      if (!confirm(`Delete cron job "${name}"? This cannot be undone.`)) return;
+      try {
+        const res = await fetch(`/api/crons/${id}`, { method: 'DELETE' });
+        const data = await res.json();
+        if (data.error) throw new Error(data.error);
+        toast('Cron job deleted');
+        setTimeout(loadCrons, 1000);
+      } catch (e) { toast('Failed: ' + e.message, false); }
+    }
+
+    // Heartbeat
+    async function loadHeartbeat() {
+      try {
+        const res = await fetch('/api/files/read?path=HEARTBEAT.md');
+        const data = await res.json();
+        document.getElementById('heartbeat-content').value = data.content || '# HEARTBEAT.md\n\n## Tasks\n\n- Add your heartbeat tasks here\n';
+      } catch (e) {
+        document.getElementById('heartbeat-content').value = '# HEARTBEAT.md\n\n## Tasks\n\n- Add your heartbeat tasks here\n';
+      }
+    }
+
+    async function saveHeartbeat() {
+      try {
+        const content = document.getElementById('heartbeat-content').value;
+        const res = await fetch('/api/files/write', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ path: 'HEARTBEAT.md', content })
+        });
+        const data = await res.json();
+        if (data.error) throw new Error(data.error);
+        toast('Heartbeat config saved!');
+      } catch (e) { toast('Failed: ' + e.message, false); }
+    }
+
+    // Run history
+    function populateHistoryFilter() {
+      const sel = document.getElementById('history-filter');
+      const existing = sel.value;
+      sel.innerHTML = '<option value="all">All Jobs</option>' +
+        allJobs.map(j => `<option value="${j.id}">${j.name || j.id}</option>`).join('');
+      sel.value = existing || 'all';
+    }
+
+    function loadHistory() {
+      const jobFilter = document.getElementById('history-filter').value;
+      const statusFilter = document.getElementById('history-status').value;
+      let runs = [...allRuns].sort((a, b) => (b.timestamp || '').localeCompare(a.timestamp || ''));
+      if (jobFilter !== 'all') runs = runs.filter(r => r.jobId === jobFilter);
+      if (statusFilter !== 'all') runs = runs.filter(r => statusFilter === 'error' ? r.status === 'error' : r.status !== 'error');
+      const el = document.getElementById('history-table');
+      if (!runs.length) {
+        el.innerHTML = '<div class="empty"><div class="emoji">📭</div>No run history found</div>';
+        return;
+      }
+      const jobName = (id) => { const j = allJobs.find(j => j.id === id); return j ? j.name : id?.substring(0, 8) || '—'; };
+      el.innerHTML = `<table class="runs-table">
+        <thead><tr><th>Job</th><th>Status</th><th>Duration</th><th>Time</th><th>Summary</th></tr></thead>
+        <tbody>${runs.slice(0, 50).map(r => `<tr>
+          <td>${escHtml(jobName(r.jobId))}</td>
+          <td>${r.status === 'error' ? '<span class="badge badge-red">ERROR</span>' : '<span class="badge badge-green">OK</span>'}</td>
+          <td>${relTime(r.durationMs)}</td>
+          <td>${r.timestamp ? new Date(r.timestamp).toLocaleString() : '—'}</td>
+          <td style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escHtml(r.summary || r.error || '')}">${escHtml(r.summary || r.error || '—')}</td>
+        </tr>`).join('')}</tbody>
+      </table>`;
+    }
+
+    // Countdown timer
+    setInterval(() => {
+      document.querySelectorAll('.countdown').forEach(el => {
+        // Re-render countdowns on each tick
+      });
+      renderCrons(); // re-render to update countdowns
+    }, 30000);
+
+    // Keyboard shortcut - Escape to close modal
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+    document.getElementById('modal').addEventListener('click', e => { if (e.target === e.currentTarget) closeModal(); });
+
+    // Init
+    loadCrons();
+  </script>
+</body>
+</html>

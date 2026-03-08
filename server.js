@@ -565,6 +565,76 @@ app.get('/api/crons', (req, res) => {
   res.json(result);
 });
 
+// API: cron CRUD operations
+app.post('/api/crons', (req, res) => {
+  try {
+    const { name, description, schedule, tz, model, timeout, message, channel, to } = req.body;
+    if (!name || !schedule || !message) return res.json({ error: 'Name, schedule, and message are required' });
+    let cmd = `openclaw cron add --name "${name.replace(/"/g, '\\"')}" --schedule "${schedule}" --tz "${tz || 'UTC'}" --message "${message.replace(/"/g, '\\"')}"`;
+    if (model) cmd += ` --model "${model}"`;
+    if (timeout) cmd += ` --timeout ${timeout}`;
+    if (description) cmd += ` --description "${description.replace(/"/g, '\\"')}"`;
+    if (channel && to) cmd += ` --announce ${channel} --to "${to}"`;
+    const result = exec(cmd + ' 2>&1');
+    cache.delete('crons_simple');
+    cache.delete('orch_crons');
+    res.json({ ok: true, output: result });
+  } catch (e) { res.json({ error: e.message }); }
+});
+
+app.put('/api/crons/:id', (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, description, schedule, tz, model, timeout, message, channel, to } = req.body;
+    let cmd = `openclaw cron edit ${id}`;
+    if (name) cmd += ` --name "${name.replace(/"/g, '\\"')}"`;
+    if (schedule) cmd += ` --schedule "${schedule}"`;
+    if (tz) cmd += ` --tz "${tz}"`;
+    if (model) cmd += ` --model "${model}"`;
+    if (timeout) cmd += ` --timeout ${timeout}`;
+    if (message) cmd += ` --message "${message.replace(/"/g, '\\"')}"`;
+    if (description) cmd += ` --description "${description.replace(/"/g, '\\"')}"`;
+    const result = exec(cmd + ' 2>&1');
+    cache.delete('crons_simple');
+    cache.delete('orch_crons');
+    res.json({ ok: true, output: result });
+  } catch (e) { res.json({ error: e.message }); }
+});
+
+app.post('/api/crons/:id/enable', (req, res) => {
+  try {
+    const result = exec(`openclaw cron enable ${req.params.id} 2>&1`);
+    cache.delete('crons_simple');
+    cache.delete('orch_crons');
+    res.json({ ok: true, output: result });
+  } catch (e) { res.json({ error: e.message }); }
+});
+
+app.post('/api/crons/:id/disable', (req, res) => {
+  try {
+    const result = exec(`openclaw cron disable ${req.params.id} 2>&1`);
+    cache.delete('crons_simple');
+    cache.delete('orch_crons');
+    res.json({ ok: true, output: result });
+  } catch (e) { res.json({ error: e.message }); }
+});
+
+app.post('/api/crons/:id/run', (req, res) => {
+  try {
+    const result = exec(`openclaw cron run ${req.params.id} 2>&1`);
+    res.json({ ok: true, output: result });
+  } catch (e) { res.json({ error: e.message }); }
+});
+
+app.delete('/api/crons/:id', (req, res) => {
+  try {
+    const result = exec(`openclaw cron rm ${req.params.id} --yes 2>&1`);
+    cache.delete('crons_simple');
+    cache.delete('orch_crons');
+    res.json({ ok: true, output: result });
+  } catch (e) { res.json({ error: e.message }); }
+});
+
 // API: stats/today — compact session activity summary for dashboard card
 // Reuses orch_sessions cache if warm (no extra disk I/O); falls back to fast file-stat scan
 app.get('/api/stats/today', (req, res) => {
