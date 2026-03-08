@@ -812,6 +812,7 @@
       to { transform: rotate(360deg); }
     }
   </style>
+  <link rel="stylesheet" href="/responsive.css">
 </head>
 <body>
   <!-- Floating Orbs -->
@@ -823,6 +824,8 @@
   <div class="header">
     <div class="header-left">
       <h1>Clawdbot Dashboard</h1>
+      <button class="mobile-menu-btn" onclick="toggleMobileNav()">☰</button>
+      <div class="mobile-overlay" onclick="toggleMobileNav()"></div>
       <div class="nav-links">
         <a href="/mail.html" class="nav-link">📧 Mail</a>
         <a href="/agents.html" class="nav-link">🎛️ Agents</a>
@@ -1604,6 +1607,14 @@
     
     // Update live status every 5 seconds
     setInterval(updateLiveStatus, 5000);
+
+    // Mobile nav toggle
+    function toggleMobileNav() {
+      document.querySelector('.nav-links').classList.toggle('open');
+      document.querySelector('.mobile-overlay').classList.toggle('open');
+      var overlay = document.querySelector('.mobile-overlay');
+      overlay.style.display = overlay.classList.contains('open') ? 'block' : 'none';
+    }
   </script>
 </body>
 </html>

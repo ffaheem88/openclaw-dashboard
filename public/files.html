@@ -81,11 +81,12 @@
     .modified{color:var(--amber) !important}
     .modified::after{content:" •";color:var(--amber)}
   </style>
+  <link rel="stylesheet" href="/responsive.css">
 </head>
 <body>
   <div class="topbar">
     <h1>🗂️ Workspace Files</h1>
-    <div class="nav">
+    <button class="mobile-menu-btn" onclick="toggleMobileNav()">☰</button><div class="mobile-overlay" onclick="toggleMobileNav()"></div><div class="nav">
       <a href="/">← Dashboard</a>
       <a href="/agents.html">Agents</a>
       <a href="/neural.html">Neural</a>
@@ -352,6 +353,7 @@ document.addEventListener('keydown', function(e) {
 });
 
 loadTree();
+function toggleMobileNav(){document.querySelector(".nav").classList.toggle("open");var o=document.querySelector(".mobile-overlay");o.classList.toggle("open");o.style.display=o.classList.contains("open")?"block":"none";}
 </script>
 </body>
 </html>

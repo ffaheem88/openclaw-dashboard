@@ -452,6 +452,7 @@
       .layout { padding: 0 16px 16px; }
     }
   </style>
+  <link rel="stylesheet" href="/responsive.css">
 </head>
 <body>
   <div class="orb orb-1"></div>
@@ -461,7 +462,7 @@
   <div class="header">
     <div class="header-left">
       <h1>Clawdbot</h1>
-      <div class="nav-links">
+      <button class="mobile-menu-btn" onclick="toggleMobileNav()">☰</button><div class="mobile-overlay" onclick="toggleMobileNav()"></div><div class="nav-links">
         <a href="/index.html" class="nav-link">🏠 Dashboard</a>
         <a href="/mail.html" class="nav-link">📧 Mail</a>
         <a href="/agents.html" class="nav-link">🎛️ Agents</a>
@@ -880,6 +881,7 @@
     }
 
     initPage();
-  </script>
+  function toggleMobileNav(){var n=document.querySelector(".nav-links");n.classList.toggle("open");var o=document.querySelector(".mobile-overlay");o.classList.toggle("open");o.style.display=o.classList.contains("open")?"block":"none";}
+</script>
 </body>
 </html>

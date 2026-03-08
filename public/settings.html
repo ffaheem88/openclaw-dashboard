@@ -740,6 +740,7 @@ body::before{
 .health-dot.down{background:#ef4444;box-shadow:0 0 8px #ef444466}
 .health-meta{font-size:12px;color:var(--text-secondary);margin-top:2px}
 </style>
+  <link rel="stylesheet" href="/responsive.css">
 </head>
 <body>
 
@@ -748,7 +749,7 @@ body::before{
     <h1>⚙️ Settings</h1>
     <div class="header-subtitle">Models • Tasks • Configuration</div>
   </div>
-  <div class="nav-links">
+  <button class="mobile-menu-btn" onclick="toggleMobileNav()">☰</button><div class="mobile-overlay" onclick="toggleMobileNav()"></div><div class="nav-links">
     <a href="/">📊 Dashboard</a>
     <a href="/mail.html">📧 Mail</a>
     <a href="/agents.html">🎛️ Agents</a>
@@ -1357,6 +1358,7 @@ function saveFeatures() {
 }
 
 loadCurrentConfig();
+function toggleMobileNav(){var n=document.querySelector(".nav-links");n.classList.toggle("open");var o=document.querySelector(".mobile-overlay");o.classList.toggle("open");o.style.display=o.classList.contains("open")?"block":"none";}
 </script>
 </body>
 </html>

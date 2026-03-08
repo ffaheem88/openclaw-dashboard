@@ -925,6 +925,7 @@
         }
         details.feed-collapsible > summary::-webkit-details-marker { display: none; }
     </style>
+  <link rel="stylesheet" href="/responsive.css">
 </head>
 <body>
     <div class="header">
@@ -932,7 +933,7 @@
             <h1>🎛️ Agent Orchestration</h1>
             <div class="header-subtitle">Tasks • Agents • History</div>
         </div>
-        <div class="header-nav">
+        <button class="mobile-menu-btn" onclick="toggleMobileNav()">☰</button><div class="mobile-overlay" onclick="toggleMobileNav()"></div><div class="header-nav">
             <a href="/">📊 Dashboard</a>
             <a href="/mail.html">📧 Mail</a>
             <a href="/settings.html">⚙️ Settings</a>
@@ -1667,6 +1668,7 @@
                 el.textContent = '(' + text + ')';
             }
         }, 1000);
-    </script>
+    function toggleMobileNav(){var n=document.querySelector(".header-nav");n.classList.toggle("open");var o=document.querySelector(".mobile-overlay");o.classList.toggle("open");o.style.display=o.classList.contains("open")?"block":"none";}
+</script>
 </body>
 </html>
