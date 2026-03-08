@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chat — OpenClaw Dashboard</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/responsive.css">
+  <style>
+    *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+    :root{--bg:#0a0e17;--bg2:#0f1420;--glass:rgba(255,255,255,.03);--border:rgba(255,255,255,.08);--text:#f1f5f9;--text2:#94a3b8;--muted:#64748b;--cyan:#06b6d4;--purple:#8b5cf6;--green:#10b981;--amber:#f59e0b;--red:#f43f5e;--gradient:linear-gradient(135deg,#06b6d4,#8b5cf6,#ec4899)}
+    body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);font-size:14px;height:100vh;display:flex;flex-direction:column}
+    .topbar{background:var(--bg2);border-bottom:1px solid var(--border);padding:12px 24px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+    .topbar h1{font-size:18px;font-weight:700;background:var(--gradient);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+    .topbar .nav{display:flex;gap:12px;align-items:center}
+    .topbar .nav a{color:var(--text2);text-decoration:none;font-size:13px;padding:6px 12px;border-radius:6px;transition:all .2s}
+    .topbar .nav a:hover{background:var(--glass);color:var(--text)}
+    .chat-container{flex:1;display:flex;overflow:hidden}
+    .sidebar{width:260px;background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0}
+    .sidebar-title{padding:14px 16px;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--muted);border-bottom:1px solid var(--border)}
+    .target-list{flex:1;overflow-y:auto;padding:8px}
+    .target-item{padding:10px 14px;border-radius:8px;cursor:pointer;margin-bottom:4px;transition:all .2s;display:flex;align-items:center;gap:10px}
+    .target-item:hover{background:var(--glass)}
+    .target-item.active{background:rgba(6,182,212,.1);border:1px solid rgba(6,182,212,.2)}
+    .target-item .icon{font-size:18px;flex-shrink:0}
+    .target-item .info{min-width:0}
+    .target-item .name{font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .target-item .detail{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .target-item .status-dot{width:6px;height:6px;border-radius:50%;margin-left:auto;flex-shrink:0}
+    .dot-active{background:var(--green)}
+    .dot-idle{background:var(--amber)}
+    .dot-off{background:var(--muted)}
+    .separator{padding:10px 14px 6px;font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+    .chat-main{flex:1;display:flex;flex-direction:column;min-width:0}
+    .chat-header{padding:12px 20px;background:var(--bg2);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px}
+    .chat-header .target-name{font-weight:600;font-size:15px}
+    .chat-header .target-info{font-size:12px;color:var(--muted)}
+    .chat-header select{margin-left:auto;padding:6px 10px;background:var(--glass);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;font-family:inherit}
+    .messages{flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:12px}
+    .msg{max-width:75%;padding:12px 16px;border-radius:14px;font-size:13px;line-height:1.6;word-wrap:break-word}
+    .msg.user{align-self:flex-end;background:rgba(6,182,212,.15);border:1px solid rgba(6,182,212,.2);border-bottom-right-radius:4px}
+    .msg.assistant{align-self:flex-start;background:var(--glass);border:1px solid var(--border);border-bottom-left-radius:4px}
+    .msg.system{align-self:center;background:rgba(139,92,246,.1);border:1px solid rgba(139,92,246,.2);font-size:12px;color:var(--purple);max-width:90%;text-align:center}
+    .msg pre{background:rgba(0,0,0,.3);border-radius:6px;padding:10px;overflow-x:auto;font-family:'JetBrains Mono',monospace;font-size:12px;margin:8px 0}
+    .msg code{font-family:'JetBrains Mono',monospace;font-size:12px;background:rgba(0,0,0,.2);padding:2px 5px;border-radius:3px}
+    .msg-time{font-size:10px;color:var(--muted);margin-top:4px}
+    .input-area{padding:16px 20px;background:var(--bg2);border-top:1px solid var(--border);display:flex;gap:10px;align-items:flex-end}
+    .input-area textarea{flex:1;padding:12px 16px;background:var(--glass);border:1px solid var(--border);border-radius:12px;color:var(--text);font-size:14px;font-family:inherit;resize:none;min-height:44px;max-height:160px;outline:none;line-height:1.5}
+    .input-area textarea:focus{border-color:var(--cyan)}
+    .send-btn{padding:12px 20px;background:var(--gradient);border:none;border-radius:12px;color:#fff;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap;transition:opacity .2s}
+    .send-btn:hover{opacity:.9}
+    .send-btn:disabled{opacity:.4;cursor:not-allowed}
+    .typing{color:var(--muted);font-size:12px;padding:4px 0;font-style:italic}
+    .empty-chat{flex:1;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:14px;text-align:center;padding:40px}
+    .toast{position:fixed;bottom:24px;right:24px;padding:12px 20px;border-radius:8px;font-size:13px;font-weight:500;z-index:999;display:none}
+    .toast.show{display:block;animation:slideUp .3s ease}
+    .toast.error{background:rgba(244,63,94,.9);color:#fff}
+    @keyframes slideUp{from{transform:translateY(20px);opacity:0}to{transform:none;opacity:1}}
+    @media(max-width:768px){.sidebar{display:none}.chat-container{flex-direction:column}}
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <h1>💬 Chat</h1>
+    <button class="mobile-menu-btn" onclick="toggleMobileNav()">☰</button>
+    <div class="mobile-overlay" onclick="toggleMobileNav()"></div>
+    <div class="nav">
+      <a href="/">📊 Dashboard</a>
+      <a href="/live.html">🔴 Live</a>
+        <a href="/chat.html">💬 Chat</a>
+      <a href="/analytics.html">📈 Analytics</a>
+      <a href="/agents-control.html">🎛️ Agents</a>
+      <a href="/memory.html">🧠 Memory</a>
+      <a href="/files.html">🗂️ Files</a>
+      <a href="/crons.html">⏰ Crons</a>
+      <a href="/settings.html">⚙️ Settings</a>
+      <a href="/logout" style="color:var(--red)">⏏ Logout</a>
+    </div>
+  </div>
+
+  <div class="chat-container">
+    <div class="sidebar">
+      <div class="sidebar-title">Chat Targets</div>
+      <div class="target-list" id="targetList">
+        <div class="separator">Sessions</div>
+        <div style="padding:14px;color:var(--muted);font-size:12px">Loading...</div>
+      </div>
+    </div>
+    <div class="chat-main" id="chatMain">
+      <div class="empty-chat" id="emptyState">
+        <div>
+          <div style="font-size:32px;margin-bottom:12px">💬</div>
+          <div style="font-size:16px;font-weight:600;color:var(--text);margin-bottom:8px">Select a target to chat</div>
+          <div>Talk to your main agent, sub-agents, or any LLM provider directly</div>
+        </div>
+      </div>
+      <div id="chatView" style="display:none;flex:1;flex-direction:column">
+        <div class="chat-header" id="chatHeader">
+          <div>
+            <div class="target-name" id="headerName">—</div>
+            <div class="target-info" id="headerInfo">—</div>
+          </div>
+          <select id="modelOverride" onchange="updateModel()" title="Override model">
+            <option value="">Default model</option>
+          </select>
+        </div>
+        <div class="messages" id="messages"></div>
+        <div id="typingIndicator" class="typing" style="padding:0 20px;display:none">Agent is thinking...</div>
+        <div class="input-area">
+          <textarea id="msgInput" placeholder="Type a message..." rows="1" onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
+          <button class="send-btn" id="sendBtn" onclick="sendMessage()">Send →</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+<script>
+var currentTarget = null;
+var chatHistory = {};
+var models = [];
+
+function toggleMobileNav(){
+  document.querySelector('.nav').classList.toggle('open');
+  var o=document.querySelector('.mobile-overlay');o.classList.toggle('open');
+  o.style.display=o.classList.contains('open')?'block':'none';
+}
+
+function escapeHtml(s){var d=document.createElement('div');d.textContent=s;return d.innerHTML}
+
+function toast(msg){var t=document.getElementById('toast');t.textContent=msg;t.className='toast show error';setTimeout(function(){t.className='toast'},3000)}
+
+function autoResize(el){el.style.height='auto';el.style.height=Math.min(el.scrollHeight,160)+'px'}
+
+function handleKey(e){
+  if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMessage()}
+}
+
+function formatContent(text){
+  if(!text)return'';
+  var safe=escapeHtml(text);
+  // Code blocks
+  safe=safe.replace(/```(\w*)\n?([\s\S]*?)```/g,function(m,lang,code){return'<pre><code>'+code.trim()+'</code></pre>'});
+  // Inline code
+  safe=safe.replace(/`([^`]+)`/g,'<code>$1</code>');
+  // Bold
+  safe=safe.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>');
+  // Italic
+  safe=safe.replace(/\*(.+?)\*/g,'<em>$1</em>');
+  // Newlines
+  safe=safe.replace(/\n/g,'<br>');
+  return safe;
+}
+
+function addMessage(role,content,time){
+  var messages=document.getElementById('messages');
+  var div=document.createElement('div');
+  div.className='msg '+role;
+  div.innerHTML=formatContent(content);
+  if(time){var t=document.createElement('div');t.className='msg-time';t.textContent=time;div.appendChild(t)}
+  messages.appendChild(div);
+  messages.scrollTop=messages.scrollHeight;
+}
+
+function loadTargets(){
+  // Load active sessions
+  fetch('/api/live/sessions',{credentials:'same-origin'}).then(function(r){return r.json()}).then(function(sessions){
+    var list=document.getElementById('targetList');
+    var html='<div class="separator">Active Sessions</div>';
+    
+    sessions.forEach(function(s){
+      var age=s.updatedAt?Math.floor((Date.now()-new Date(s.updatedAt).getTime())/60000):999;
+      var dotCls=age<2?'dot-active':age<10?'dot-idle':'dot-off';
+      var label=s.key.replace(/^agent:(voice|main):/,'');
+      var icon=s.key.includes('whatsapp')?'📱':s.key.includes('cron')?'⏰':s.key.includes('subagent')?'🤖':'💬';
+      html+='<div class="target-item" data-type="session" data-key="'+escapeHtml(s.key)+'" onclick="selectTarget(this)">';
+      html+='<span class="icon">'+icon+'</span><div class="info"><div class="name">'+escapeHtml(label)+'</div>';
+      html+='<div class="detail">'+(age<60?age+'m ago':age<1440?Math.floor(age/60)+'h ago':Math.floor(age/1440)+'d ago')+'</div></div>';
+      html+='<span class="status-dot '+dotCls+'"></span></div>';
+    });
+
+    // Add direct provider targets
+    html+='<div class="separator">Direct Chat (no session)</div>';
+    var providers=[
+      {id:'anthropic/claude-sonnet-4-6',name:'Claude Sonnet 4.6',icon:'🟣'},
+      {id:'anthropic/claude-opus-4-6',name:'Claude Opus 4.6',icon:'🟣'},
+      {id:'openrouter/openai/gpt-5.4',name:'GPT-5.4',icon:'🟢'},
+      {id:'openrouter/openai/o4-mini',name:'o4-mini',icon:'🟢'},
+      {id:'openrouter/google/gemini-2.5-pro-preview',name:'Gemini 2.5 Pro',icon:'🔵'},
+      {id:'openrouter/deepseek/deepseek-r1-0528',name:'DeepSeek R1',icon:'🔷'},
+      {id:'ollama/llama3.2',name:'Llama 3.2 (Local)',icon:'🦙'}
+    ];
+    providers.forEach(function(p){
+      html+='<div class="target-item" data-type="provider" data-model="'+escapeHtml(p.id)+'" onclick="selectTarget(this)">';
+      html+='<span class="icon">'+p.icon+'</span><div class="info"><div class="name">'+escapeHtml(p.name)+'</div>';
+      html+='<div class="detail">'+escapeHtml(p.id)+'</div></div></div>';
+    });
+
+    list.innerHTML=html;
+  });
+
+  // Load models for override dropdown
+  fetch('/api/settings/models',{credentials:'same-origin'}).then(function(r){return r.json()}).then(function(d){
+    models=d.models||[];
+    var sel=document.getElementById('modelOverride');
+    sel.innerHTML='<option value="">Default model</option>';
+    var top=['claude-sonnet-4','claude-opus-4','gpt-5.4','gpt-4.1','gemini-2.5-pro','deepseek-r1'];
+    models.filter(function(m){return top.some(function(t){return m.id.includes(t)})}).slice(0,15).forEach(function(m){
+      sel.innerHTML+='<option value="openrouter/'+escapeHtml(m.id)+'">'+escapeHtml(m.id)+'</option>';
+    });
+  }).catch(function(){});
+}
+
+function selectTarget(el){
+  document.querySelectorAll('.target-item').forEach(function(t){t.classList.remove('active')});
+  el.classList.add('active');
+  
+  var type=el.dataset.type;
+  currentTarget={type:type};
+  
+  if(type==='session'){
+    currentTarget.key=el.dataset.key;
+    currentTarget.name=el.querySelector('.name').textContent;
+    document.getElementById('headerName').textContent=currentTarget.name;
+    document.getElementById('headerInfo').textContent='Session: '+currentTarget.key;
+  } else {
+    currentTarget.model=el.dataset.model;
+    currentTarget.name=el.querySelector('.name').textContent;
+    document.getElementById('headerName').textContent=currentTarget.name;
+    document.getElementById('headerInfo').textContent='Direct: '+currentTarget.model;
+  }
+
+  document.getElementById('emptyState').style.display='none';
+  var cv=document.getElementById('chatView');
+  cv.style.display='flex';
+  
+  // Load history for this target
+  var messages=document.getElementById('messages');
+  messages.innerHTML='';
+  var histKey=type==='session'?currentTarget.key:currentTarget.model;
+  if(chatHistory[histKey]){
+    chatHistory[histKey].forEach(function(m){addMessage(m.role,m.content,m.time)});
+  } else if(type==='session'){
+    // Load last messages from session log
+    addMessage('system','Loading session history...');
+    fetch('/api/live/session?key='+encodeURIComponent(currentTarget.key)+'&limit=20',{credentials:'same-origin'})
+      .then(function(r){return r.json()}).then(function(d){
+        messages.innerHTML='';
+        (d.messages||[]).forEach(function(m){
+          if(m.role==='user'||m.role==='assistant'){
+            var text=m.content;
+            if(Array.isArray(text)) text=text.filter(function(c){return c.type==='text'}).map(function(c){return c.text}).join('\n');
+            if(text) addMessage(m.role,text);
+          }
+        });
+        if(!d.messages||!d.messages.length) addMessage('system','No message history. Send a message to start.');
+      }).catch(function(){messages.innerHTML='';addMessage('system','Could not load history')});
+  } else {
+    addMessage('system','Direct chat with '+currentTarget.name+'. Messages are not persisted.');
+  }
+
+  document.getElementById('msgInput').focus();
+}
+
+function sendMessage(){
+  var input=document.getElementById('msgInput');
+  var text=input.value.trim();
+  if(!text||!currentTarget)return;
+  
+  input.value='';
+  autoResize(input);
+  addMessage('user',text,new Date().toLocaleTimeString());
+  
+  var sendBtn=document.getElementById('sendBtn');
+  sendBtn.disabled=true;
+  document.getElementById('typingIndicator').style.display='block';
+
+  var histKey=currentTarget.type==='session'?currentTarget.key:currentTarget.model;
+  if(!chatHistory[histKey])chatHistory[histKey]=[];
+  chatHistory[histKey].push({role:'user',content:text,time:new Date().toLocaleTimeString()});
+
+  if(currentTarget.type==='session'){
+    // Send to session via API
+    fetch('/api/chat/session',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      credentials:'same-origin',
+      body:JSON.stringify({key:currentTarget.key,message:text})
+    }).then(function(r){return r.json()}).then(function(d){
+      document.getElementById('typingIndicator').style.display='none';
+      sendBtn.disabled=false;
+      if(d.error){addMessage('system','Error: '+d.error);return}
+      addMessage('assistant',d.response||d.output||'(no response)',new Date().toLocaleTimeString());
+      chatHistory[histKey].push({role:'assistant',content:d.response||d.output||'',time:new Date().toLocaleTimeString()});
+    }).catch(function(e){
+      document.getElementById('typingIndicator').style.display='none';
+      sendBtn.disabled=false;
+      addMessage('system','Send failed: '+e.message);
+    });
+  } else {
+    // Direct provider chat
+    var modelOverride=document.getElementById('modelOverride').value;
+    var model=modelOverride||currentTarget.model;
+    var msgs=chatHistory[histKey].filter(function(m){return m.role==='user'||m.role==='assistant'}).map(function(m){return{role:m.role,content:m.content}});
+    
+    fetch('/api/chat/provider',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      credentials:'same-origin',
+      body:JSON.stringify({model:model,messages:msgs})
+    }).then(function(r){return r.json()}).then(function(d){
+      document.getElementById('typingIndicator').style.display='none';
+      sendBtn.disabled=false;
+      if(d.error){addMessage('system','Error: '+d.error);return}
+      addMessage('assistant',d.response||'(no response)',new Date().toLocaleTimeString());
+      chatHistory[histKey].push({role:'assistant',content:d.response||'',time:new Date().toLocaleTimeString()});
+    }).catch(function(e){
+      document.getElementById('typingIndicator').style.display='none';
+      sendBtn.disabled=false;
+      addMessage('system','Send failed: '+e.message);
+    });
+  }
+}
+
+function updateModel(){/* model override is read on send */}
+
+loadTargets();
+</script>
+</body>
+</html>

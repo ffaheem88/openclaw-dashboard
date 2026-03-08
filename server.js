@@ -3952,6 +3952,111 @@ app.post('/api/agent/steer', express.json(), requireAuth, (req, res) => {
   res.json({ ok: true });
 });
 
+// POST /api/chat/session — send message to an existing session
+app.post('/api/chat/session', requireAuth, async (req, res) => {
+  const { key, message } = req.body || {};
+  if (!key || !message) return res.status(400).json({ error: 'key and message required' });
+  try {
+    const result = runCommand('openclaw', ['sessions', 'send', '--key', key, '--message', message], { timeout: 60000 });
+    if (result.ok) {
+      res.json({ ok: true, response: result.stdout || '(sent)' });
+    } else {
+      // Fallback: try writing to steer file
+      const steerDir = CONFIG_DIR;
+      const steerFile = path.join(steerDir, 'steer-requests.json');
+      let requests = [];
+      try { requests = JSON.parse(fs.readFileSync(steerFile, 'utf8')); } catch {}
+      requests.push({ key, message, timestamp: new Date().toISOString() });
+      fs.writeFileSync(steerFile, JSON.stringify(requests, null, 2));
+      res.json({ ok: true, response: '(message queued — session may not support direct send)', fallback: true });
+    }
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// POST /api/chat/provider — direct chat with an LLM provider
+app.post('/api/chat/provider', requireAuth, async (req, res) => {
+  const { model, messages } = req.body || {};
+  if (!model || !messages || !messages.length) return res.status(400).json({ error: 'model and messages required' });
+  
+  try {
+    const keys = getConfiguredProviderKeys();
+    let apiUrl, headers, body;
+    
+    if (model.startsWith('anthropic/')) {
+      if (!keys.anthropic) return res.json({ error: 'Anthropic API key not configured' });
+      apiUrl = 'https://api.anthropic.com/v1/messages';
+      headers = { 'Content-Type': 'application/json', 'x-api-key': keys.anthropic, 'anthropic-version': '2023-06-01' };
+      body = JSON.stringify({
+        model: model.replace('anthropic/', ''),
+        max_tokens: 4096,
+        messages: messages.map(m => ({ role: m.role, content: m.content }))
+      });
+    } else if (model.startsWith('openrouter/')) {
+      if (!keys.openrouter) return res.json({ error: 'OpenRouter API key not configured' });
+      apiUrl = 'https://openrouter.ai/api/v1/chat/completions';
+      headers = { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + keys.openrouter };
+      body = JSON.stringify({
+        model: model.replace('openrouter/', ''),
+        messages: messages.map(m => ({ role: m.role, content: m.content }))
+      });
+    } else if (model.startsWith('openai/') || model.startsWith('openai-codex/')) {
+      if (!keys.openai) return res.json({ error: 'OpenAI API key not configured' });
+      apiUrl = 'https://api.openai.com/v1/chat/completions';
+      headers = { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + keys.openai };
+      body = JSON.stringify({
+        model: model.replace(/^openai(-codex)?\//, ''),
+        messages: messages.map(m => ({ role: m.role, content: m.content }))
+      });
+    } else if (model.startsWith('ollama/')) {
+      apiUrl = 'http://localhost:11434/api/chat';
+      headers = { 'Content-Type': 'application/json' };
+      body = JSON.stringify({
+        model: model.replace('ollama/', ''),
+        messages: messages.map(m => ({ role: m.role, content: m.content })),
+        stream: false
+      });
+    } else {
+      return res.json({ error: 'Unknown provider for model: ' + model });
+    }
+    
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 120000);
+    
+    const response = await fetch(apiUrl, { method: 'POST', headers, body, signal: controller.signal });
+    clearTimeout(timer);
+    
+    const data = await response.json();
+    
+    if (!response.ok) {
+      return res.json({ error: data.error?.message || data.error || 'API error: HTTP ' + response.status });
+    }
+    
+    // Extract response text
+    let responseText = '';
+    if (data.content && Array.isArray(data.content)) {
+      // Anthropic format
+      responseText = data.content.filter(c => c.type === 'text').map(c => c.text).join('\n');
+    } else if (data.choices && data.choices[0]) {
+      // OpenAI/OpenRouter format
+      responseText = data.choices[0].message?.content || '';
+    } else if (data.message) {
+      // Ollama format
+      responseText = data.message.content || '';
+    }
+    
+    res.json({
+      response: responseText,
+      model: model,
+      usage: data.usage || null
+    });
+  } catch (e) {
+    if (e.name === 'AbortError') return res.json({ error: 'Request timed out (120s)' });
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // GET/POST /api/settings/alerts — alert configuration
 app.get('/api/settings/alerts', requireAuth, (req, res) => {
   const configPath = path.join(CONFIG_DIR, 'alerts-config.json');
