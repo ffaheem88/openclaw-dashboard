@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Agent Controls — OpenClaw Dashboard</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/responsive.css">
+  <style>
+    *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+    :root{--bg:#0a0e17;--bg2:#0f1420;--glass:rgba(255,255,255,.03);--border:rgba(255,255,255,.08);--text:#f1f5f9;--text2:#94a3b8;--muted:#64748b;--cyan:#06b6d4;--purple:#8b5cf6;--green:#10b981;--amber:#f59e0b;--red:#f43f5e;--gradient:linear-gradient(135deg,#06b6d4,#8b5cf6,#ec4899)}
+    body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);font-size:14px;min-height:100vh}
+    .topbar{background:var(--bg2);border-bottom:1px solid var(--border);padding:12px 24px;display:flex;align-items:center;justify-content:space-between}
+    .topbar h1{font-size:18px;font-weight:700;background:var(--gradient);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+    .topbar .nav{display:flex;gap:12px;align-items:center}
+    .topbar .nav a{color:var(--text2);text-decoration:none;font-size:13px;padding:6px 12px;border-radius:6px;transition:all .2s}
+    .topbar .nav a:hover{background:var(--glass);color:var(--text)}
+    .content{padding:20px 24px;max-width:1200px;margin:0 auto}
+    .section-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+    .section-header h2{font-size:16px;font-weight:700}
+    .btn{padding:8px 16px;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .2s}
+    .btn-cyan{background:rgba(6,182,212,.15);color:var(--cyan);border:1px solid rgba(6,182,212,.3)}
+    .btn-cyan:hover{background:rgba(6,182,212,.25)}
+    .btn-red{background:rgba(244,63,94,.15);color:var(--red);border:1px solid rgba(244,63,94,.3)}
+    .btn-green{background:rgba(16,185,129,.15);color:var(--green);border:1px solid rgba(16,185,129,.3)}
+    .agent-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:14px;margin-bottom:24px}
+    .agent-card{background:var(--glass);border:1px solid var(--border);border-radius:12px;padding:18px;transition:border-color .2s}
+    .agent-card:hover{border-color:rgba(255,255,255,.15)}
+    .agent-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px}
+    .agent-name{font-weight:600;font-size:14px;display:flex;align-items:center;gap:8px}
+    .agent-status{font-size:11px;padding:3px 8px;border-radius:10px;font-weight:600}
+    .status-active{background:rgba(16,185,129,.15);color:var(--green)}
+    .status-idle{background:rgba(245,158,11,.15);color:var(--amber)}
+    .status-dead{background:rgba(100,116,139,.15);color:var(--muted)}
+    .agent-details{display:flex;flex-direction:column;gap:6px;font-size:12px;color:var(--text2);margin-bottom:14px}
+    .agent-details .row{display:flex;justify-content:space-between}
+    .agent-details .lbl{color:var(--muted)}
+    .agent-actions{display:flex;gap:8px;flex-wrap:wrap}
+    .agent-actions .btn{padding:6px 12px;font-size:11px}
+    .tree-view{background:var(--glass);border:1px solid var(--border);border-radius:12px;padding:18px;margin-bottom:24px}
+    .tree-view h3{font-size:14px;font-weight:600;margin-bottom:12px}
+    .tree-node{padding:6px 0;padding-left:20px;border-left:2px solid var(--border);font-size:13px;font-family:'JetBrains Mono',monospace}
+    .tree-node .node-label{color:var(--cyan)}
+    .tree-node .node-meta{color:var(--muted);font-size:11px;margin-left:8px}
+    .steer-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;align-items:center;justify-content:center}
+    .steer-modal.open{display:flex}
+    .steer-box{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:24px;width:90%;max-width:500px}
+    .steer-box h3{margin-bottom:12px;font-size:15px}
+    .steer-box textarea{width:100%;height:100px;padding:12px;background:var(--glass);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;font-size:13px;resize:vertical;outline:none}
+    .steer-box textarea:focus{border-color:var(--cyan)}
+    .steer-box .actions{display:flex;gap:8px;margin-top:12px;justify-content:flex-end}
+    .empty{color:var(--muted);text-align:center;padding:40px;font-size:13px}
+    .toast{position:fixed;bottom:24px;right:24px;padding:12px 20px;border-radius:8px;font-size:13px;font-weight:500;z-index:999;display:none}
+    .toast.show{display:block;animation:slideUp .3s ease}
+    .toast.success{background:rgba(16,185,129,.9);color:#fff}
+    .toast.error{background:rgba(244,63,94,.9);color:#fff}
+    @keyframes slideUp{from{transform:translateY(20px);opacity:0}to{transform:none;opacity:1}}
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <h1>🎛️ Agent Controls</h1>
+    <button class="mobile-menu-btn" onclick="toggleMobileNav()">☰</button>
+    <div class="mobile-overlay" onclick="toggleMobileNav()"></div>
+    <div class="nav">
+      <a href="/">← Dashboard</a>
+      <a href="/live.html">Live</a>
+      <a href="/analytics.html">Analytics</a>
+      <a href="/channels.html">Channels</a>
+      <a href="/settings.html">Settings</a>
+      <a href="/logout" style="color:var(--red)">Logout</a>
+    </div>
+  </div>
+
+  <div class="content">
+    <div class="section-header">
+      <h2>🤖 Active Sessions</h2>
+      <button class="btn btn-cyan" onclick="loadAgents()">🔄 Refresh</button>
+    </div>
+
+    <div class="agent-grid" id="agentGrid">
+      <div class="empty">Loading agents...</div>
+    </div>
+
+    <div class="tree-view">
+      <h3>🌳 Session Tree</h3>
+      <div id="sessionTree"><div class="empty">Loading...</div></div>
+    </div>
+  </div>
+
+  <div class="steer-modal" id="steerModal">
+    <div class="steer-box">
+      <h3>📡 Steer Agent</h3>
+      <p style="font-size:12px;color:var(--text2);margin-bottom:12px">Send a message to redirect this agent's task:</p>
+      <textarea id="steerMessage" placeholder="e.g. Focus on fixing the CSS first, then move to the API..."></textarea>
+      <div class="actions">
+        <button class="btn btn-cyan" onclick="closeSteer()">Cancel</button>
+        <button class="btn btn-green" onclick="sendSteer()">Send</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+<script>
+var steerTarget = null;
+
+function toggleMobileNav(){
+  document.querySelector('.nav').classList.toggle('open');
+  var o=document.querySelector('.mobile-overlay');o.classList.toggle('open');
+  o.style.display=o.classList.contains('open')?'block':'none';
+}
+
+function toast(msg, type) {
+  var t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show ' + type;
+  setTimeout(function(){ t.className = 'toast'; }, 3000);
+}
+
+function formatAge(ts) {
+  if (!ts) return '-';
+  var ms = Date.now() - new Date(ts).getTime();
+  var s = Math.floor(ms/1000);
+  if (s < 60) return s + 's ago';
+  var m = Math.floor(s/60);
+  if (m < 60) return m + 'm ago';
+  var h = Math.floor(m/60);
+  if (h < 24) return h + 'h ago';
+  return Math.floor(h/24) + 'd ago';
+}
+
+function getStatus(updatedAt) {
+  if (!updatedAt) return {cls:'status-dead',text:'unknown'};
+  var ms = Date.now() - new Date(updatedAt).getTime();
+  if (ms < 120000) return {cls:'status-active',text:'active'};
+  if (ms < 600000) return {cls:'status-idle',text:'idle'};
+  return {cls:'status-dead',text:'inactive'};
+}
+
+function loadAgents() {
+  fetch('/api/live/sessions').then(function(r){return r.json()}).then(function(sessions) {
+    var grid = document.getElementById('agentGrid');
+    if (!sessions.length) { grid.innerHTML = '<div class="empty">No active sessions</div>'; return; }
+
+    var html = '';
+    sessions.forEach(function(s) {
+      var st = getStatus(s.updatedAt);
+      var label = s.key.replace('agent:voice:','');
+      if (label.length > 40) label = label.substring(0,40) + '…';
+      html += '<div class="agent-card">' +
+        '<div class="agent-header"><div class="agent-name">🤖 ' + label + '</div>' +
+        '<span class="agent-status ' + st.cls + '">' + st.text + '</span></div>' +
+        '<div class="agent-details">' +
+        '<div class="row"><span class="lbl">Session ID</span><span>' + (s.sessionId||'-').substring(0,8) + '…</span></div>' +
+        '<div class="row"><span class="lbl">Channel</span><span>' + (s.origin||'unknown') + '</span></div>' +
+        '<div class="row"><span class="lbl">Type</span><span>' + (s.chatType||'-') + '</span></div>' +
+        '<div class="row"><span class="lbl">Last active</span><span>' + formatAge(s.updatedAt) + '</span></div>' +
+        '</div>' +
+        '<div class="agent-actions">' +
+        '<button class="btn btn-cyan" onclick="viewLive(\'' + s.key + '\')">👁️ View</button>' +
+        '<button class="btn btn-green" onclick="openSteer(\'' + s.key + '\')">📡 Steer</button>' +
+        '</div></div>';
+    });
+    grid.innerHTML = html;
+
+    // Build tree
+    var tree = document.getElementById('sessionTree');
+    var treeHtml = '';
+    sessions.forEach(function(s) {
+      var label = s.key.replace('agent:voice:','');
+      var st = getStatus(s.updatedAt);
+      treeHtml += '<div class="tree-node"><span class="node-label">' + label + '</span>' +
+        '<span class="node-meta">' + st.text + ' · ' + formatAge(s.updatedAt) + '</span></div>';
+    });
+    tree.innerHTML = treeHtml || '<div class="empty">No sessions</div>';
+  });
+}
+
+function viewLive(key) {
+  window.location.href = '/live.html?session=' + encodeURIComponent(key);
+}
+
+function openSteer(key) {
+  steerTarget = key;
+  document.getElementById('steerMessage').value = '';
+  document.getElementById('steerModal').classList.add('open');
+}
+
+function closeSteer() {
+  document.getElementById('steerModal').classList.remove('open');
+  steerTarget = null;
+}
+
+function sendSteer() {
+  if (!steerTarget) return;
+  var msg = document.getElementById('steerMessage').value.trim();
+  if (!msg) { toast('Enter a message', 'error'); return; }
+  fetch('/api/agent/steer', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({key: steerTarget, message: msg})
+  }).then(function(r){return r.json()}).then(function(d) {
+    if (d.ok) { toast('Message sent to agent', 'success'); closeSteer(); }
+    else toast(d.error || 'Failed', 'error');
+  }).catch(function(){ toast('Network error', 'error'); });
+}
+
+loadAgents();
+setInterval(loadAgents, 10000);
+</script>
+</body>
+</html>

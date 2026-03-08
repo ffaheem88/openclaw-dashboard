@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Memory Explorer — OpenClaw Dashboard</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/responsive.css">
+  <style>
+    *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+    :root{--bg:#0a0e17;--bg2:#0f1420;--glass:rgba(255,255,255,.03);--border:rgba(255,255,255,.08);--text:#f1f5f9;--text2:#94a3b8;--muted:#64748b;--cyan:#06b6d4;--purple:#8b5cf6;--green:#10b981;--amber:#f59e0b;--red:#f43f5e;--gradient:linear-gradient(135deg,#06b6d4,#8b5cf6,#ec4899)}
+    body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);font-size:14px;min-height:100vh}
+    .topbar{background:var(--bg2);border-bottom:1px solid var(--border);padding:12px 24px;display:flex;align-items:center;justify-content:space-between}
+    .topbar h1{font-size:18px;font-weight:700;background:var(--gradient);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+    .topbar .nav{display:flex;gap:12px;align-items:center}
+    .topbar .nav a{color:var(--text2);text-decoration:none;font-size:13px;padding:6px 12px;border-radius:6px;transition:all .2s}
+    .topbar .nav a:hover{background:var(--glass);color:var(--text)}
+    .content{padding:20px 24px;max-width:1200px;margin:0 auto}
+    .search-bar{display:flex;gap:12px;margin-bottom:20px}
+    .search-bar input{flex:1;padding:12px 16px;background:var(--glass);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:14px;font-family:inherit;outline:none}
+    .search-bar input:focus{border-color:var(--cyan)}
+    .btn{padding:8px 16px;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .2s}
+    .btn-cyan{background:rgba(6,182,212,.15);color:var(--cyan);border:1px solid rgba(6,182,212,.3)}
+    .btn-red{background:rgba(244,63,94,.15);color:var(--red);border:1px solid rgba(244,63,94,.3)}
+    .btn-green{background:rgba(16,185,129,.15);color:var(--green);border:1px solid rgba(16,185,129,.3)}
+    .tabs{display:flex;gap:4px;margin-bottom:20px;border-bottom:1px solid var(--border);padding-bottom:8px}
+    .tab{padding:8px 16px;border-radius:8px 8px 0 0;cursor:pointer;font-size:13px;font-weight:500;color:var(--text2);transition:all .2s}
+    .tab.active{background:rgba(6,182,212,.1);color:var(--cyan);border-bottom:2px solid var(--cyan)}
+    .tab:hover{color:var(--text)}
+    .tab-content{display:none}
+    .tab-content.active{display:block}
+    .memory-card{background:var(--glass);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:12px;transition:border-color .2s}
+    .memory-card:hover{border-color:rgba(255,255,255,.15)}
+    .memory-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px}
+    .memory-path{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--cyan)}
+    .memory-score{font-size:11px;color:var(--amber);font-weight:600}
+    .memory-content{font-size:13px;color:var(--text2);line-height:1.7;max-height:200px;overflow:hidden;position:relative}
+    .memory-content.expanded{max-height:none}
+    .memory-footer{display:flex;gap:8px;margin-top:10px;align-items:center}
+    .memory-footer .btn{padding:4px 10px;font-size:11px}
+    .memory-meta{font-size:11px;color:var(--muted);flex:1}
+    .file-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px}
+    .file-card{background:var(--glass);border:1px solid var(--border);border-radius:10px;padding:14px;cursor:pointer;transition:all .2s}
+    .file-card:hover{border-color:var(--cyan);background:rgba(6,182,212,.05)}
+    .file-card .name{font-weight:600;font-size:13px;margin-bottom:4px}
+    .file-card .info{font-size:11px;color:var(--muted)}
+    .editor-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;align-items:center;justify-content:center}
+    .editor-modal.open{display:flex}
+    .editor-box{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:24px;width:90%;max-width:700px;max-height:80vh;display:flex;flex-direction:column}
+    .editor-box h3{margin-bottom:12px;font-size:15px}
+    .editor-box textarea{flex:1;min-height:300px;padding:14px;background:var(--glass);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:13px;line-height:1.6;resize:vertical;outline:none}
+    .editor-box .actions{display:flex;gap:8px;margin-top:12px;justify-content:flex-end}
+    .neural-stats{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;margin-bottom:20px}
+    .stat-card{background:var(--glass);border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center}
+    .stat-card .value{font-size:24px;font-weight:700;margin-bottom:2px}
+    .stat-card .label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+    .empty{color:var(--muted);text-align:center;padding:40px;font-size:13px}
+    .toast{position:fixed;bottom:24px;right:24px;padding:12px 20px;border-radius:8px;font-size:13px;font-weight:500;z-index:999;display:none}
+    .toast.show{display:block;animation:slideUp .3s ease}
+    .toast.success{background:rgba(16,185,129,.9);color:#fff}
+    .toast.error{background:rgba(244,63,94,.9);color:#fff}
+    @keyframes slideUp{from{transform:translateY(20px);opacity:0}to{transform:none;opacity:1}}
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <h1>🧠 Memory Explorer</h1>
+    <button class="mobile-menu-btn" onclick="toggleMobileNav()">☰</button>
+    <div class="mobile-overlay" onclick="toggleMobileNav()"></div>
+    <div class="nav">
+      <a href="/">← Dashboard</a>
+      <a href="/live.html">Live</a>
+      <a href="/neural.html">Neural</a>
+      <a href="/files.html">Files</a>
+      <a href="/settings.html">Settings</a>
+      <a href="/logout" style="color:var(--red)">Logout</a>
+    </div>
+  </div>
+
+  <div class="content">
+    <div class="search-bar">
+      <input type="text" id="searchInput" placeholder="🔍 Search memories semantically..." onkeydown="if(event.key==='Enter')searchMemory()">
+      <button class="btn btn-cyan" onclick="searchMemory()">Search</button>
+    </div>
+
+    <div class="tabs">
+      <div class="tab active" onclick="switchTab('search')">🔍 Search</div>
+      <div class="tab" onclick="switchTab('files')">📁 Memory Files</div>
+      <div class="tab" onclick="switchTab('neural')">🧠 Neural Stats</div>
+    </div>
+
+    <div class="tab-content active" id="tab-search">
+      <div id="searchResults"><div class="empty">Search for memories above, or browse memory files</div></div>
+    </div>
+
+    <div class="tab-content" id="tab-files">
+      <div id="memoryFiles"><div class="empty">Loading...</div></div>
+    </div>
+
+    <div class="tab-content" id="tab-neural">
+      <div class="neural-stats" id="neuralStats"><div class="empty">Loading neural memory stats...</div></div>
+      <div id="neuralDetails"></div>
+    </div>
+  </div>
+
+  <div class="editor-modal" id="editorModal">
+    <div class="editor-box">
+      <h3 id="editorTitle">Edit Memory</h3>
+      <textarea id="editorContent"></textarea>
+      <div class="actions">
+        <button class="btn btn-cyan" onclick="closeEditor()">Cancel</button>
+        <button class="btn btn-green" onclick="saveEditor()">💾 Save</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+<script>
+var currentEditPath = null;
+
+function toggleMobileNav(){
+  document.querySelector('.nav').classList.toggle('open');
+  var o=document.querySelector('.mobile-overlay');o.classList.toggle('open');
+  o.style.display=o.classList.contains('open')?'block':'none';
+}
+
+function toast(msg, type) {
+  var t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show ' + type;
+  setTimeout(function(){ t.className = 'toast'; }, 3000);
+}
+
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach(function(t,i){
+    var tabs = ['search','files','neural'];
+    t.classList.toggle('active', tabs[i] === name);
+  });
+  document.querySelectorAll('.tab-content').forEach(function(c){
+    c.classList.toggle('active', c.id === 'tab-' + name);
+  });
+  if (name === 'files') loadMemoryFiles();
+  if (name === 'neural') loadNeuralStats();
+}
+
+function searchMemory() {
+  var q = document.getElementById('searchInput').value.trim();
+  if (!q) return;
+  var results = document.getElementById('searchResults');
+  results.innerHTML = '<div class="empty">Searching...</div>';
+
+  fetch('/api/workspace/search?q=' + encodeURIComponent(q)).then(function(r){return r.json()}).then(function(data) {
+    if (!data.results || !data.results.length) {
+      results.innerHTML = '<div class="empty">No results for "' + q + '"</div>';
+      return;
+    }
+    var html = '';
+    data.results.forEach(function(r) {
+      html += '<div class="memory-card">' +
+        '<div class="memory-header"><span class="memory-path">' + r.file + ':' + r.line + '</span></div>' +
+        '<div class="memory-content">' + escapeHtml(r.text || '') + '</div>' +
+        '<div class="memory-footer">' +
+        '<button class="btn btn-cyan" onclick="editFile(\'' + r.file + '\')">✏️ Edit</button>' +
+        '<button class="btn btn-cyan" onclick="window.location.href=\'/files.html?open=' + encodeURIComponent(r.file) + '\'">📄 Open</button>' +
+        '</div></div>';
+    });
+    results.innerHTML = html;
+  });
+}
+
+function loadMemoryFiles() {
+  fetch('/api/workspace/files').then(function(r){return r.json()}).then(function(data) {
+    var container = document.getElementById('memoryFiles');
+    var memFiles = (data.files || []).filter(function(f) {
+      return f.path.startsWith('memory/') || f.name === 'MEMORY.md' || f.name === 'SOUL.md' || f.name === 'USER.md' || f.name === 'AGENTS.md';
+    });
+    if (!memFiles.length) {
+      container.innerHTML = '<div class="empty">No memory files found</div>';
+      return;
+    }
+    var html = '<div class="file-list">';
+    memFiles.forEach(function(f) {
+      var icon = f.name === 'MEMORY.md' ? '🧠' : f.name === 'SOUL.md' ? '👻' : f.name === 'USER.md' ? '👤' : '📝';
+      html += '<div class="file-card" onclick="editFile(\'' + f.path + '\')">' +
+        '<div class="name">' + icon + ' ' + f.name + '</div>' +
+        '<div class="info">' + f.path + ' · ' + formatSize(f.size) + '</div></div>';
+    });
+    html += '</div>';
+    container.innerHTML = html;
+  });
+}
+
+function loadNeuralStats() {
+  fetch('/api/neural/stats').then(function(r){return r.json()}).then(function(data) {
+    var container = document.getElementById('neuralStats');
+    if (data.unavailable) {
+      container.innerHTML = '<div class="empty">Neural memory not installed. Install nmem for neural features.</div>';
+      return;
+    }
+    container.innerHTML =
+      '<div class="stat-card"><div class="value" style="color:var(--cyan)">' + (data.neurons||0) + '</div><div class="label">Neurons</div></div>' +
+      '<div class="stat-card"><div class="value" style="color:var(--purple)">' + (data.synapses||0) + '</div><div class="label">Synapses</div></div>' +
+      '<div class="stat-card"><div class="value" style="color:var(--green)">' + (data.fibers||0) + '</div><div class="label">Fibers</div></div>' +
+      '<div class="stat-card"><div class="value" style="color:var(--amber)">' + (data.concepts||0) + '</div><div class="label">Concepts</div></div>';
+  }).catch(function() {
+    document.getElementById('neuralStats').innerHTML = '<div class="empty">Neural memory unavailable</div>';
+  });
+}
+
+function editFile(filePath) {
+  fetch('/api/workspace/file?path=' + encodeURIComponent(filePath)).then(function(r){return r.json()}).then(function(data) {
+    if (data.error) { toast(data.error, 'error'); return; }
+    currentEditPath = filePath;
+    document.getElementById('editorTitle').textContent = '✏️ ' + filePath;
+    document.getElementById('editorContent').value = data.content;
+    document.getElementById('editorModal').classList.add('open');
+  });
+}
+
+function closeEditor() {
+  document.getElementById('editorModal').classList.remove('open');
+  currentEditPath = null;
+}
+
+function saveEditor() {
+  if (!currentEditPath) return;
+  var content = document.getElementById('editorContent').value;
+  fetch('/api/workspace/file', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({path: currentEditPath, content: content})
+  }).then(function(r){return r.json()}).then(function(d) {
+    if (d.ok) { toast('Saved ' + currentEditPath, 'success'); closeEditor(); }
+    else toast(d.error || 'Save failed', 'error');
+  });
+}
+
+function formatSize(bytes) {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024*1024) return (bytes/1024).toFixed(1) + ' KB';
+  return (bytes/(1024*1024)).toFixed(1) + ' MB';
+}
+
+function escapeHtml(text) {
+  var div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+loadMemoryFiles();
+</script>
+</body>
+</html>

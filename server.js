@@ -3478,6 +3478,39 @@ app.get('/api/live/session', requireAuth, (req, res) => {
   } catch (e) { res.json({ error: e.message }); }
 });
 
+// POST /api/agent/steer — send a message to redirect an agent
+app.post('/api/agent/steer', express.json(), requireAuth, (req, res) => {
+  const { key, message } = req.body || {};
+  if (!key || !message) return res.json({ error: 'Key and message required' });
+  // Write steer request to a file that the agent can pick up
+  const steerDir = path.join(__dirname, 'config');
+  if (!fs.existsSync(steerDir)) fs.mkdirSync(steerDir, { recursive: true });
+  const steerFile = path.join(steerDir, 'steer-requests.json');
+  let requests = [];
+  try { requests = JSON.parse(fs.readFileSync(steerFile, 'utf8')); } catch {}
+  requests.push({ key, message, timestamp: new Date().toISOString() });
+  fs.writeFileSync(steerFile, JSON.stringify(requests, null, 2));
+  res.json({ ok: true });
+});
+
+// GET/POST /api/settings/alerts — alert configuration
+app.get('/api/settings/alerts', requireAuth, (req, res) => {
+  const configPath = path.join(__dirname, 'config', 'alerts-config.json');
+  try {
+    const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+    res.json(config);
+  } catch { res.json({}); }
+});
+
+app.post('/api/settings/alerts', express.json(), requireAuth, (req, res) => {
+  try {
+    const configDir = path.join(__dirname, 'config');
+    if (!fs.existsSync(configDir)) fs.mkdirSync(configDir, { recursive: true });
+    fs.writeFileSync(path.join(configDir, 'alerts-config.json'), JSON.stringify(req.body, null, 2));
+    res.json({ ok: true });
+  } catch (e) { res.json({ error: e.message }); }
+});
+
 // POST /api/workspace/file — save file content
 app.post('/api/workspace/file', express.json({ limit: '1mb' }), requireAuth, (req, res) => {
   const { path: relPath, content } = req.body || {};

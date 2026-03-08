@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Alerts & Auth — OpenClaw Dashboard</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/responsive.css">
+  <style>
+    *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+    :root{--bg:#0a0e17;--bg2:#0f1420;--glass:rgba(255,255,255,.03);--border:rgba(255,255,255,.08);--text:#f1f5f9;--text2:#94a3b8;--muted:#64748b;--cyan:#06b6d4;--purple:#8b5cf6;--green:#10b981;--amber:#f59e0b;--red:#f43f5e;--gradient:linear-gradient(135deg,#06b6d4,#8b5cf6,#ec4899)}
+    body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);font-size:14px;min-height:100vh}
+    .topbar{background:var(--bg2);border-bottom:1px solid var(--border);padding:12px 24px;display:flex;align-items:center;justify-content:space-between}
+    .topbar h1{font-size:18px;font-weight:700;background:var(--gradient);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+    .topbar .nav{display:flex;gap:12px;align-items:center}
+    .topbar .nav a{color:var(--text2);text-decoration:none;font-size:13px;padding:6px 12px;border-radius:6px;transition:all .2s}
+    .topbar .nav a:hover{background:var(--glass);color:var(--text)}
+    .content{padding:20px 24px;max-width:900px;margin:0 auto}
+    h2{font-size:16px;font-weight:700;margin:24px 0 14px;display:flex;align-items:center;gap:8px}
+    h2:first-child{margin-top:0}
+    .card{background:var(--glass);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:16px}
+    .card h3{font-size:14px;font-weight:600;margin-bottom:14px}
+    .form-row{display:flex;gap:12px;align-items:center;margin-bottom:12px}
+    .form-row label{min-width:140px;font-size:13px;color:var(--text2)}
+    .form-row input,.form-row select{flex:1;padding:10px 14px;background:var(--glass);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;font-family:inherit;outline:none}
+    .form-row input:focus,.form-row select:focus{border-color:var(--cyan)}
+    .toggle-row{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--border)}
+    .toggle-row:last-child{border-bottom:none}
+    .toggle-row .info{font-size:13px}
+    .toggle-row .desc{font-size:11px;color:var(--muted)}
+    .toggle{position:relative;width:44px;height:24px;flex-shrink:0}
+    .toggle input{opacity:0;width:0;height:0}
+    .toggle .slider{position:absolute;inset:0;background:rgba(255,255,255,.1);border-radius:12px;cursor:pointer;transition:.3s}
+    .toggle .slider::before{content:'';position:absolute;height:18px;width:18px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:.3s}
+    .toggle input:checked+.slider{background:var(--cyan)}
+    .toggle input:checked+.slider::before{transform:translateX(20px)}
+    .btn{padding:10px 20px;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .2s}
+    .btn-save{background:linear-gradient(135deg,var(--cyan),var(--purple));color:#fff}
+    .btn-save:hover{opacity:.9}
+    .btn-red{background:rgba(244,63,94,.15);color:var(--red);border:1px solid rgba(244,63,94,.3)}
+    .alert-log{max-height:300px;overflow-y:auto}
+    .alert-entry{padding:10px 14px;border-bottom:1px solid var(--border);font-size:12px;display:flex;gap:10px;align-items:flex-start}
+    .alert-entry .time{color:var(--muted);white-space:nowrap;min-width:70px}
+    .alert-entry .msg{flex:1;color:var(--text2)}
+    .alert-entry.urgent .msg{color:var(--red);font-weight:500}
+    .alert-entry.warning .msg{color:var(--amber)}
+    .msg-div{margin-top:8px;padding:10px 14px;border-radius:8px;font-size:13px;display:none}
+    .msg-div.success{display:block;background:rgba(16,185,129,.1);color:var(--green)}
+    .msg-div.error{display:block;background:rgba(244,63,94,.1);color:var(--red)}
+    @media(max-width:768px){.form-row{flex-direction:column;align-items:stretch}.form-row label{min-width:auto}}
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <h1>🔔 Alerts & Auth</h1>
+    <button class="mobile-menu-btn" onclick="toggleMobileNav()">☰</button>
+    <div class="mobile-overlay" onclick="toggleMobileNav()"></div>
+    <div class="nav">
+      <a href="/">← Dashboard</a>
+      <a href="/analytics.html">Analytics</a>
+      <a href="/channels.html">Channels</a>
+      <a href="/settings.html">Settings</a>
+      <a href="/logout" style="color:var(--red)">Logout</a>
+    </div>
+  </div>
+
+  <div class="content">
+    <h2>🔔 Alert Configuration</h2>
+
+    <div class="card">
+      <h3>Alert Thresholds</h3>
+      <div class="form-row">
+        <label>Daily budget limit ($)</label>
+        <input type="number" id="budgetLimit" placeholder="10.00" step="0.50" value="10">
+      </div>
+      <div class="form-row">
+        <label>Error rate threshold</label>
+        <input type="number" id="errorThreshold" placeholder="5" value="5">
+      </div>
+      <div class="form-row">
+        <label>Disk usage alert (%)</label>
+        <input type="number" id="diskThreshold" placeholder="80" value="80">
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Alert Channels</h3>
+      <div class="toggle-row">
+        <div><div class="info">📱 WhatsApp Alerts</div><div class="desc">Send critical alerts to WhatsApp</div></div>
+        <label class="toggle"><input type="checkbox" id="alertWhatsapp" checked><span class="slider"></span></label>
+      </div>
+      <div class="toggle-row">
+        <div><div class="info">📧 Email Alerts</div><div class="desc">Send alerts via email</div></div>
+        <label class="toggle"><input type="checkbox" id="alertEmail"><span class="slider"></span></label>
+      </div>
+      <div class="toggle-row">
+        <div><div class="info">🔔 ntfy.sh Push</div><div class="desc">Send to ntfy.sh topic</div></div>
+        <label class="toggle"><input type="checkbox" id="alertNtfy"><span class="slider"></span></label>
+      </div>
+      <div class="form-row" style="margin-top:12px">
+        <label>ntfy.sh topic</label>
+        <input type="text" id="ntfyTopic" placeholder="openclaw-alerts">
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Alert Types</h3>
+      <div class="toggle-row">
+        <div><div class="info">💰 Budget Exceeded</div><div class="desc">Alert when daily cost exceeds limit</div></div>
+        <label class="toggle"><input type="checkbox" id="typeBudget" checked><span class="slider"></span></label>
+      </div>
+      <div class="toggle-row">
+        <div><div class="info">🔴 Agent Offline</div><div class="desc">Alert when agent stops responding</div></div>
+        <label class="toggle"><input type="checkbox" id="typeOffline" checked><span class="slider"></span></label>
+      </div>
+      <div class="toggle-row">
+        <div><div class="info">💾 Disk Full</div><div class="desc">Alert when disk usage exceeds threshold</div></div>
+        <label class="toggle"><input type="checkbox" id="typeDisk" checked><span class="slider"></span></label>
+      </div>
+      <div class="toggle-row">
+        <div><div class="info">❌ Error Spike</div><div class="desc">Alert on repeated errors</div></div>
+        <label class="toggle"><input type="checkbox" id="typeErrors" checked><span class="slider"></span></label>
+      </div>
+      <div class="toggle-row">
+        <div><div class="info">🔌 Channel Down</div><div class="desc">Alert when a channel disconnects</div></div>
+        <label class="toggle"><input type="checkbox" id="typeChannel"><span class="slider"></span></label>
+      </div>
+    </div>
+
+    <button class="btn btn-save" onclick="saveAlertConfig()" style="margin-bottom:24px">💾 Save Alert Configuration</button>
+    <div class="msg-div" id="alertMsg"></div>
+
+    <h2>👥 User Management</h2>
+
+    <div class="card">
+      <h3>Access Roles</h3>
+      <div class="toggle-row">
+        <div><div class="info">🔐 Admin</div><div class="desc">Full access — settings, files, controls</div></div>
+        <span style="color:var(--green);font-size:12px;font-weight:600">Current user</span>
+      </div>
+      <div class="toggle-row">
+        <div><div class="info">👁️ Viewer</div><div class="desc">Read-only — dashboards, analytics, logs</div></div>
+        <span style="color:var(--muted);font-size:12px">Coming soon</span>
+      </div>
+      <p style="font-size:12px;color:var(--muted);margin-top:12px">Multi-user auth with role-based access will be available in a future update. Currently single-admin mode.</p>
+    </div>
+
+    <h2>📜 Recent Alerts</h2>
+    <div class="card">
+      <div class="alert-log" id="alertLog">
+        <div style="color:var(--muted);text-align:center;padding:20px;font-size:13px">No alerts yet. Configure thresholds above to start monitoring.</div>
+      </div>
+    </div>
+  </div>
+
+<script>
+function toggleMobileNav(){
+  document.querySelector('.nav').classList.toggle('open');
+  var o=document.querySelector('.mobile-overlay');o.classList.toggle('open');
+  o.style.display=o.classList.contains('open')?'block':'none';
+}
+
+function saveAlertConfig() {
+  var config = {
+    budgetLimit: parseFloat(document.getElementById('budgetLimit').value) || 10,
+    errorThreshold: parseInt(document.getElementById('errorThreshold').value) || 5,
+    diskThreshold: parseInt(document.getElementById('diskThreshold').value) || 80,
+    channels: {
+      whatsapp: document.getElementById('alertWhatsapp').checked,
+      email: document.getElementById('alertEmail').checked,
+      ntfy: document.getElementById('alertNtfy').checked,
+      ntfyTopic: document.getElementById('ntfyTopic').value
+    },
+    types: {
+      budget: document.getElementById('typeBudget').checked,
+      offline: document.getElementById('typeOffline').checked,
+      disk: document.getElementById('typeDisk').checked,
+      errors: document.getElementById('typeErrors').checked,
+      channel: document.getElementById('typeChannel').checked
+    }
+  };
+
+  fetch('/api/settings/alerts', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify(config)
+  }).then(function(r){return r.json()}).then(function(d) {
+    var msg = document.getElementById('alertMsg');
+    if (d.ok) { msg.className = 'msg-div success'; msg.textContent = '✓ Alert configuration saved'; }
+    else { msg.className = 'msg-div error'; msg.textContent = d.error || 'Failed to save'; }
+    setTimeout(function(){ msg.className = 'msg-div'; }, 4000);
+  });
+}
+
+function loadAlertConfig() {
+  fetch('/api/settings/alerts').then(function(r){return r.json()}).then(function(config) {
+    if (!config || config.error) return;
+    if (config.budgetLimit) document.getElementById('budgetLimit').value = config.budgetLimit;
+    if (config.errorThreshold) document.getElementById('errorThreshold').value = config.errorThreshold;
+    if (config.diskThreshold) document.getElementById('diskThreshold').value = config.diskThreshold;
+    if (config.channels) {
+      if (config.channels.whatsapp !== undefined) document.getElementById('alertWhatsapp').checked = config.channels.whatsapp;
+      if (config.channels.email !== undefined) document.getElementById('alertEmail').checked = config.channels.email;
+      if (config.channels.ntfy !== undefined) document.getElementById('alertNtfy').checked = config.channels.ntfy;
+      if (config.channels.ntfyTopic) document.getElementById('ntfyTopic').value = config.channels.ntfyTopic;
+    }
+    if (config.types) {
+      if (config.types.budget !== undefined) document.getElementById('typeBudget').checked = config.types.budget;
+      if (config.types.offline !== undefined) document.getElementById('typeOffline').checked = config.types.offline;
+      if (config.types.disk !== undefined) document.getElementById('typeDisk').checked = config.types.disk;
+      if (config.types.errors !== undefined) document.getElementById('typeErrors').checked = config.types.errors;
+      if (config.types.channel !== undefined) document.getElementById('typeChannel').checked = config.types.channel;
+    }
+  }).catch(function(){});
+}
+
+loadAlertConfig();
+</script>
+</body>
+</html>
