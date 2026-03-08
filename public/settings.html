@@ -752,9 +752,8 @@ body::before{
   <button class="mobile-menu-btn" onclick="toggleMobileNav()">☰</button><div class="mobile-overlay" onclick="toggleMobileNav()"></div><div class="nav-links">
         <a href="/">📊 Dashboard</a>
         <a href="/live.html">🔴 Live</a>
-        <a href="/analytics.html">📊 Analytics</a>
+        <a href="/analytics.html">📈 Analytics</a>
         <a href="/agents-control.html">🎛️ Agents</a>
-        <a href="/channels.html">🔌 Channels</a>
         <a href="/memory.html">🧠 Memory</a>
         <a href="/files.html">🗂️ Files</a>
         <a href="/crons.html">⏰ Crons</a>
@@ -793,6 +792,56 @@ body::before{
   </div>
 
   <!-- Provider Health Section -->
+  <div class="section fade-in">
+    <div class="section-title">🔌 Channel & Service Status</div>
+    <p class="section-desc">Active messaging channels, systemd services, and connection health.</p>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-top:12px" id="channelGrid">
+      <div style="color:var(--text-muted);text-align:center;padding:16px;font-size:13px">Loading channels...</div>
+    </div>
+    <script>
+    (function loadChannelStatus() {
+      fetch('/api/live/sessions',{credentials:'same-origin'}).then(function(r){return r.json()}).then(function(sessions) {
+        var channels = {};
+        sessions.forEach(function(s) {
+          var ch = s.origin || 'unknown';
+          if (!channels[ch]) channels[ch] = {total:0, direct:0, group:0};
+          channels[ch].total++;
+          if (s.chatType === 'direct') channels[ch].direct++;
+          else channels[ch].group++;
+        });
+        var icons = {whatsapp:'📱',telegram:'✈️',discord:'🎮',signal:'🔐',slack:'💼',msteams:'💼',heartbeat:'💓'};
+        var grid = document.getElementById('channelGrid');
+        var names = Object.keys(channels);
+        if (!names.length) { grid.innerHTML = '<div style="color:var(--text-muted);padding:16px;font-size:13px">No active channels</div>'; return; }
+        grid.innerHTML = names.map(function(ch) {
+          var c = channels[ch];
+          var icon = icons[ch] || '📡';
+          return '<div style="background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:10px;padding:14px;display:flex;align-items:center;gap:10px">' +
+            '<span style="font-size:20px">' + icon + '</span><div>' +
+            '<div style="font-weight:600;font-size:13px;text-transform:capitalize">' + ch + '</div>' +
+            '<div style="font-size:11px;color:var(--text-secondary)">' + c.total + ' sessions (' + c.direct + ' DM, ' + c.group + ' group)</div>' +
+            '</div></div>';
+        }).join('');
+      }).catch(function(){
+        document.getElementById('channelGrid').innerHTML = '<div style="color:var(--text-muted);padding:16px;font-size:13px">Channel data unavailable</div>';
+      });
+      fetch('/api/logs/services-status',{credentials:'same-origin'}).then(function(r){return r.json()}).then(function(d) {
+        var svcs = d.services || {};
+        var html = '';
+        Object.entries(svcs).forEach(function(e) {
+          var ok = e[1] === 'active';
+          html += '<div style="background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:10px;padding:14px;display:flex;align-items:center;gap:10px">' +
+            '<span style="width:8px;height:8px;border-radius:50%;background:' + (ok?'var(--accent-emerald,#10b981)':'var(--accent-rose,#f43f5e)') + '"></span><div>' +
+            '<div style="font-weight:600;font-size:13px">' + e[0] + '</div>' +
+            '<div style="font-size:11px;color:var(--text-secondary)">' + e[1] + '</div>' +
+            '</div></div>';
+        });
+        if (html) document.getElementById('channelGrid').innerHTML += html;
+      }).catch(function(){});
+    })();
+    </script>
+  </div>
+
   <div class="section fade-in">
     <div class="section-title">🏥 Provider Health</div>
     <p class="section-desc" id="healthCheckedAt">Real-time reachability of LLM providers. Auto-refreshes every 60s.</p>
