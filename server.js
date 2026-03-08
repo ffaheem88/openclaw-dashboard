@@ -3915,6 +3915,18 @@ app.get('/api/live/sessions', requireAuth, (req, res) => {
       }
     } catch {}
 
+    // Load cron job names
+    let cronNames = {};
+    try {
+      const cronPath = path.join(getOpenClawHome(), 'cron', 'jobs.json');
+      if (fs.existsSync(cronPath)) {
+        const cronData = JSON.parse(fs.readFileSync(cronPath, 'utf8'));
+        for (const job of (cronData.jobs || [])) {
+          if (job.id && job.name) cronNames[job.id] = job.name;
+        }
+      }
+    } catch {}
+
     const sessions = Object.entries(data).map(([key, val]) => {
       const origin = val.origin || {};
       // Resolve friendly name from session metadata
@@ -3928,8 +3940,8 @@ app.get('/api/live/sessions', requireAuth, (req, res) => {
         } else if (key.endsWith(':main')) {
           friendlyName = 'Main Session';
         } else if (key.includes(':cron:')) {
-          const cronId = key.split(':cron:')[1];
-          friendlyName = 'Cron: ' + cronId.substring(0, 8);
+          const cronId = key.split(':cron:')[1].split(':')[0]; // strip :run: suffix
+          friendlyName = cronNames[cronId] || ('Cron: ' + cronId.substring(0, 8));
         } else if (key.includes(':subagent:')) {
           friendlyName = 'Sub-agent: ' + key.split(':subagent:')[1].substring(0, 12);
         }
@@ -3939,14 +3951,15 @@ app.get('/api/live/sessions', requireAuth, (req, res) => {
         sessionId: val.sessionId,
         updatedAt: val.updatedAt ? new Date(val.updatedAt).toISOString() : null,
         updatedAtMs: val.updatedAt || 0,
-        chatType: val.chatType || origin.chatType || 'unknown',
+        chatType: val.chatType || origin.chatType || (key.includes(':cron:') ? 'cron' : key.includes(':subagent:') ? 'subagent' : key.endsWith(':main') ? 'main' : key.includes(':direct:') ? 'direct' : 'unknown'),
         surface: origin.surface || null,
         label: origin.label || null,
         friendlyName,
         model: val.model || null,
         lastTo: val.lastTo || null
       };
-    }).sort((a, b) => (b.updatedAtMs || 0) - (a.updatedAtMs || 0));
+    }).filter(s => !s.key.includes(':run:'))  // exclude cron run entries
+    .sort((a, b) => (b.updatedAtMs || 0) - (a.updatedAtMs || 0));
     res.json(sessions);
   } catch (e) { res.json([]); }
 });
@@ -3965,15 +3978,31 @@ app.get('/api/live/session', requireAuth, (req, res) => {
     const content = fs.readFileSync(logFile, 'utf8');
     const lines = content.trim().split('\n');
     const messages = [];
-    for (const line of lines.slice(-limit * 2)) { // read more lines than needed, filter later
+    for (const line of lines.slice(-limit * 3)) {
       try {
         const obj = JSON.parse(line);
-        if (obj.type === 'message' || obj.type === 'custom') {
+        if (obj.type === 'message' && obj.message) {
+          const msg = obj.message;
+          const role = msg.role;
+          // Only show user and assistant messages
+          if (role !== 'user' && role !== 'assistant') continue;
+          // Extract text content
+          let text = '';
+          if (typeof msg.content === 'string') {
+            text = msg.content;
+          } else if (Array.isArray(msg.content)) {
+            text = msg.content.filter(c => c.type === 'text').map(c => c.text || '').join('\n');
+          }
+          if (!text) continue;
+          // Filter out NO_REPLY, HEARTBEAT_OK, and raw metadata blocks
+          if (text.trim() === 'NO_REPLY' || text.trim() === 'HEARTBEAT_OK') continue;
+          // Filter out conversation_info JSON metadata blocks
+          if (text.includes('"schema": "openclaw.inbound_meta') || text.startsWith('Conversation info (untrusted metadata)')) continue;
           messages.push({
-            type: obj.type,
-            role: obj.message ? obj.message.role : obj.type,
-            message: obj.message,
-            timestamp: obj.timestamp || (obj.message && obj.message.timestamp),
+            type: 'message',
+            role,
+            content: text,
+            timestamp: obj.timestamp || msg.timestamp,
           });
         }
       } catch {}

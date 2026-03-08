@@ -259,8 +259,13 @@ function selectTarget(el){
             var text='';
             if(typeof content==='string') text=content;
             else if(Array.isArray(content)) text=content.filter(function(c){return c.type==='text'}).map(function(c){return c.text||''}).join('\n');
-            else if(content&&typeof content==='object') text=content.text||JSON.stringify(content);
-            if(text) addMessage(m.role,text);
+            else if(content&&typeof content==='object') text=content.text||'';
+            if(!text) return;
+            // Filter noise
+            if(text.trim()==='NO_REPLY'||text.trim()==='HEARTBEAT_OK') return;
+            if(text.includes('openclaw.inbound_meta')||text.indexOf('Conversation info (untrusted')===0) return;
+            if(text.indexOf('Sender (untrusted metadata)')===0) return;
+            addMessage(m.role,text);
           }
         });
         if(!d.messages||!d.messages.length) addMessage('system','No message history yet.');
