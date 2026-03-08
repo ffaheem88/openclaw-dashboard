@@ -34,10 +34,11 @@
     overlay.onclick = toggleNav;
     document.body.appendChild(overlay);
 
-    // Add close button inside nav
+    // Add close button inside nav — high visibility
     var closeBtn = document.createElement('button');
-    closeBtn.style.cssText = 'position:absolute;top:16px;right:16px;background:none;border:none;color:var(--text-2,#9ba3b8);font-size:20px;cursor:pointer;padding:4px';
-    closeBtn.innerHTML = '✕';
+    closeBtn.style.cssText = 'position:absolute;top:14px;right:14px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);color:#eef0f6;font-size:16px;cursor:pointer;padding:6px 10px;border-radius:6px;z-index:210;line-height:1';
+    closeBtn.textContent = '✕';
+    closeBtn.setAttribute('aria-label', 'Close menu');
     closeBtn.onclick = toggleNav;
     nav.insertBefore(closeBtn, nav.firstChild);
   }
