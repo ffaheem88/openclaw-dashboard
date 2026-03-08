@@ -1,13 +1,10 @@
-// Shared nav + mobile sliding drawer
+// Shared nav — fixes mobile sliding drawer across all pages
+// Overrides any existing toggleMobileNav to ensure consistent behavior
 (function(){
-  // Find the nav container — pages use different patterns
-  var nav = document.querySelector('.topbar .nav')
-         || document.querySelector('.nav-links')
+  var nav = document.querySelector('.nav-links')
+         || document.querySelector('.topbar .nav')
          || document.querySelector('.header-nav');
   if (!nav) return;
-
-  // Find the parent bar
-  var bar = document.querySelector('.topbar') || document.querySelector('.header') || nav.parentElement;
 
   // Mark active link
   var path = location.pathname;
@@ -20,45 +17,73 @@
     }
   });
 
-  // Inject hamburger + overlay
+  // Find overlay — pages already have one, or we create it
+  var overlay = document.querySelector('.mobile-overlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.className = 'mobile-overlay';
+    document.body.appendChild(overlay);
+  }
+  // Ensure overlay click closes nav
+  overlay.onclick = function(){ closeNav(); };
+
+  // Find or create hamburger
+  var bar = document.querySelector('.topbar') || document.querySelector('.header') || nav.parentElement;
   if (bar && !bar.querySelector('.mobile-menu-btn')) {
     var btn = document.createElement('button');
     btn.className = 'mobile-menu-btn';
     btn.setAttribute('aria-label', 'Open navigation');
-    btn.innerHTML = '<svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M3 5h14M3 10h14M3 15h14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>';
-    btn.onclick = toggleNav;
+    btn.innerHTML = '☰';
+    btn.onclick = function(){ openNav(); };
     bar.appendChild(btn);
+  } else {
+    // Rebind existing hamburger
+    var existing = bar && bar.querySelector('.mobile-menu-btn');
+    if (existing) {
+      existing.onclick = function(){ toggleNav(); };
+    }
+  }
 
-    var overlay = document.createElement('div');
-    overlay.className = 'mobile-overlay';
-    overlay.onclick = toggleNav;
-    document.body.appendChild(overlay);
-
-    // Add close button inside nav — high visibility
+  // Add close button inside nav drawer if not present
+  if (!nav.querySelector('.nav-close-btn')) {
     var closeBtn = document.createElement('button');
-    closeBtn.style.cssText = 'position:absolute;top:14px;right:14px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);color:#eef0f6;font-size:16px;cursor:pointer;padding:6px 10px;border-radius:6px;z-index:210;line-height:1';
+    closeBtn.className = 'nav-close-btn';
+    closeBtn.style.cssText = 'position:absolute;top:14px;right:14px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.15);color:#eef0f6;font-size:15px;cursor:pointer;padding:6px 10px;border-radius:6px;z-index:100001;line-height:1';
     closeBtn.textContent = '✕';
     closeBtn.setAttribute('aria-label', 'Close menu');
-    closeBtn.onclick = toggleNav;
+    closeBtn.onclick = function(){ closeNav(); };
+    nav.style.position = nav.style.position || 'relative';
     nav.insertBefore(closeBtn, nav.firstChild);
   }
 
-  function toggleNav() {
-    nav.classList.toggle('open');
-    var o = document.querySelector('.mobile-overlay');
-    if (o) o.classList.toggle('open');
-    document.body.style.overflow = nav.classList.contains('open') ? 'hidden' : '';
+  function openNav() {
+    nav.classList.add('open');
+    overlay.classList.add('open');
+    overlay.style.display = 'block';
+    document.body.style.overflow = 'hidden';
   }
+  function closeNav() {
+    nav.classList.remove('open');
+    overlay.classList.remove('open');
+    overlay.style.display = '';
+    document.body.style.overflow = '';
+  }
+  function toggleNav() {
+    if (nav.classList.contains('open')) closeNav(); else openNav();
+  }
+
+  // Override any page-level toggleMobileNav
+  window.toggleMobileNav = toggleNav;
 
   // Close on Escape
   document.addEventListener('keydown', function(e){
-    if (e.key === 'Escape' && nav.classList.contains('open')) toggleNav();
+    if (e.key === 'Escape' && nav.classList.contains('open')) closeNav();
   });
 
-  // Close on link click (mobile)
+  // Close on nav link click (mobile)
   nav.addEventListener('click', function(e){
     if (e.target.closest('a') && window.innerWidth <= 768) {
-      setTimeout(toggleNav, 50);
+      setTimeout(closeNav, 80);
     }
   });
 })();
