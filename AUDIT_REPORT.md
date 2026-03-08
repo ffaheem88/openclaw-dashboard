@@ -1,236 +1,163 @@
 # OpenClaw Dashboard Audit Report
 
-Audited: `@ffaheem88/openclaw-dashboard@1.0.4`  
-Files: 21 (server.js + 18 HTML + 1 CSS + cli.js)  
-Total lines: ~15,770
+## Critical Issues (must fix)
+- [server.js:79-87, 2965-3056, 3173-3250] Pre-setup takeover: the app intentionally allows every `/api/setup/*` route before setup completes, and `POST /api/setup/save` lets the first unauthenticated caller set the admin password. `GET /api/setup/detect` also leaks local install paths, service names, and masked provider keys before auth. Snippet: `if (req.path.startsWith('/api/setup/')) { if (!isSetupComplete()) return next(); }`. Suggested fix: require a bootstrap token, bind setup routes to localhost only, or require an out-of-band setup secret.
+- [server.js:575-639] Cron mutation APIs are both broken and shell-injectable. `POST /api/crons` and `PUT /api/crons/:id` never mount `express.json()`, so `req.body` is usually `undefined`; they then interpolate user input into shell commands and call `cache.delete(...)`, but the cache class only implements `del(...)`. Snippet: `const { name, ... } = req.body; ... let cmd = \`openclaw cron add --name "${name...}"\`; ... cache.delete('crons_simple');`. In production this yields failed cron edits plus command injection risk via `schedule`, `tz`, `model`, `to`, and `:id`. Suggested fix: add JSON body parsing, validate every field against a strict schema, and use `spawn/execFile` with argv arrays.
+- [server.js:2485-2489] `GET /api/neural/recall` is directly command-injectable. Only double quotes are escaped before building `execSync(\`nmem recall "${escaped}"\`)`; command substitution and shell metacharacters inside double quotes still execute. Suggested fix: use `execFile('nmem', ['recall', q])` or `spawn`.
+- [server.js:3254-3310] `POST /api/setup/install` is also command-injectable before auth. `openclawHome` is copied into `nmem train ...` and the generated crontab line without shell-safe escaping. Because setup is unauthenticated pre-bootstrap, a remote caller can combine this with the setup takeover above. Snippet: ``execSync(`nmem train ${sources.join(' ')} 2>&1`)`` and ``const cronLine = `... ${openclawHome}/workspace/...` ``.
+- [server.js:3521-3538] Saving a workspace file returns 500 after already mutating disk. The route writes the file, then calls nonexistent `cache.clear()`, which throws after the write succeeds. Snippet: `fs.writeFileSync(abs, content, 'utf8'); ... cache.clear();`. Production symptom: users see "save failed" while content has actually changed. Suggested fix: replace with targeted `cache.del(...)` calls and only write the success response after cache invalidation succeeds.
+- [server.js:1384-1418] "Kill session" does not kill a running session. The API just renames the JSONL file and deletes the `sessions.json` entry; it never signals OpenClaw or the underlying process. Snippet: `fs.renameSync(sessionFile, deletedName); delete sessIndex[sessionKey];`. Production symptom: the dashboard claims the session was killed while the agent may continue running invisibly. Suggested fix: call the real OpenClaw/session termination mechanism and only update metadata after a confirmed stop.
 
----
+## High Priority (should fix)
+- [server.js:56-60, 116-118, 122-130, 3124-3170, 3488-3517] Session/auth security is too weak for an exposed admin dashboard. Issues include a hard-coded fallback secret (`change-me-in-production`), insecure cookies (`secure: false`), the default in-memory session store, no CSRF protection on state-changing POSTs, and logout over GET. Suggested fix: require a strong secret, set `secure/sameSite/httpOnly`, use a persistent store, add CSRF tokens or same-site protections, and make logout POST-only.
+- [server.js:103-110, public/login.html:236-248] The login redirect flow is broken and unsafe. `POST /login` trusts `req.query.next` and calls `res.redirect(next)` without origin validation, but the login form hardcodes `action="/login"` so the normal UI drops `next` completely. Snippet: `const next = req.query.next || '/'; return res.redirect(next);`. Result: deep-link redirect does not work, while hand-crafted POSTs can produce open redirects. Suggested fix: persist `next` in a hidden input, and only allow same-origin relative paths.
+- [server.js:36, 3575-3577, bin/cli.js:119-128] Port and host settings are effectively dead. `server.js` hardcodes `const PORT = 3000;` and listens on `'0.0.0.0'`, so `PORT`, setup-saved port, and CLI `--port/--host` do not change runtime behavior. Production symptom: the service always binds to 3000 regardless of CLI or saved config. Suggested fix: read `process.env.PORT` and `process.env.HOST` at startup and validate them.
+- [server.js:1789-1803, 2182-2205] Provider/model discovery has multiple logic errors. The fallback `grep` strings are malformed literals (`' + (process.env.OPENCLAW_HOME ...`) and therefore never read keys from disk; OpenAI/Codex health checks do not send any auth header; Anthropic health treats 401/403 as "up". Suggested fix: parse `openclaw.json` as JSON instead of shelling out, and treat auth failures as configuration errors, not healthy provider responses.
+- [server.js:2740-2833, public/files.html:169-217, public/identity.html:671-708, public/memory.html:172-190] The workspace APIs do not match the file explorer UX. `/api/workspace/files` only exposes a tiny allowlist (core files + `memory/*.md`), and `/api/workspace/search` only searches `*.md` and `*.json`, while the UI advertises general workspace browsing and editing for `.sh`, `.js`, `.py`, `.yml`, etc. Production symptom: files exist on disk but never appear in the tree or search results. Suggested fix: either broaden the API to a real safe workspace index or narrow the UI copy to match actual scope.
+- [server.js:2890-2918] Network status is hard-coded to one deployment. `TUNNEL_ID`, `https://arc.net.pk`, and `https://dashboard.arc.net.pk` are compiled into the health API. Suggested fix: move them to config/env and make the checks optional per install.
+- [public/analytics.html:114-176] The analytics page is wired to an old response shape. It expects `data.sessions`, `data.models`, and `data.daily`, but `/api/costs/summary` returns `sessions` (array), `modelTotals`, and `sevenDayBreakdown`. Snippet: `document.getElementById('totalSessions').textContent = data.sessions || '—';`. Production symptom: `totalSessions` becomes `[object Object]` and the charts render empty.
+- [public/channels.html:149-182] Provider/network cards use response shapes the backend does not return. The page expects `data.providers` and `data.tunnel.status/data.dns`, while `/api/health/providers` returns a keyed object and `/api/network/status` returns `tunnel.active`, `port`, `arc`, and `dashboard`. Production symptom: "Provider check unavailable" or misleading "unknown" tunnel states on every refresh.
+- [public/conv-analytics.html:113-183] The conversation analytics heatmap is broken against the current hourly API. The page reads `data[h]`, but the backend returns `hourBuckets` and `toolBuckets`. Snippet: `var val = data[h] || 0; var max = Math.max.apply(null, Object.values(data)...);`. Result: all-zero bars or `NaN` heatmap intensity.
+- [public/crons.html:427-449] The heartbeat editor cannot work because it calls nonexistent endpoints: `/api/files/read?path=HEARTBEAT.md` and `/api/files/write`. The backend only implements `/api/workspace/file` GET/POST. Production symptom: the heartbeat tab always falls back to default text and save fails. Suggested fix: point the page at `/api/workspace/file`.
+- [public/files.html:302-318] Markdown preview creates executable links from untrusted file content. After basic escaping, it rewrites Markdown links into raw `<a href="$2" target="_blank">`, so `[x](javascript:alert(1))` becomes a clickable JavaScript URL. Suggested fix: sanitize URLs and add `rel="noopener noreferrer"`.
+- [public/neural.html:1212-1239, 1264-1269, 1532-1539] The neural graph detail panel writes DB-derived values straight into `innerHTML` without escaping (`node.type`, `node.tags`, connection labels, hot concept labels in attributes). Because neural memory can contain user-derived text, this is a stored DOM XSS vector. Suggested fix: render with `textContent` or escape every field before concatenation.
+- [public/responsive.css:207-249] The shared mobile stylesheet has an unmatched closing brace at line 249. A simple brace scan goes negative there. Production symptom: browser-dependent CSS parsing after that point, especially around `header-nav`/cron mobile rules. Suggested fix: fix the brace structure and re-test all mobile layouts.
 
-## 🔴 Critical Issues (must fix)
+## Medium Priority (nice to fix)
+- [server.js:1291-1330] Session detail truncates the wrong end of the transcript. The API returns `messages.slice(0, 100)`, which keeps the oldest 100 entries instead of the latest 100 the UI expects. Production symptom: the detail drawer misses the most recent messages and errors.
+- [server.js:2928-2939] Admin cache stats show broken disk values because two shell commands are malformed template literals: ``du -sh ' + SESSIONS_DIR + '`` and ``du -sh ' + os.homedir() + '/.neuralmemory``. Result: `sessions` and `neural` disk usage stay `?`.
+- [server.js:3110-3120, 3124-3147, 3173-3247] Config/env writes are fragile. Values are written raw as `KEY=value` with no escaping or newline filtering, so pasted values can inject extra env vars or corrupt `.env`; clearing a field does not unset the process env because only truthy values are copied back into `process.env`. Suggested fix: escape multiline values, validate input, and explicitly delete removed keys.
+- [server.js:3173-3247] `POST /api/setup/save` returns `{ restart: false }`, but most runtime paths (`WORKSPACE`, `SESSIONS_DIR`, service lists, allowed services) are captured in constants at process start. Production symptom: setup appears complete, but many routes keep reading the old paths until a restart. Suggested fix: either restart automatically or recompute all derived paths from `process.env` per request.
+- [server.js:154-167] The unauthenticated `mobile-log` and `contact` endpoints append directly to workspace files synchronously and without rate limits or sanitization. Production symptom: easy disk spam, log forging, and request-thread blocking under abuse.
+- [server.js:2776-2787, 3521-3538] Workspace file read/write only rejects `..` and absolute paths; it does not resolve symlinks. A symlink inside the workspace can escape the intended root. Suggested fix: use `realpath` and enforce the resolved path remains under `WORKSPACE`.
+- [bin/cli.js:148-159] `openclaw-dashboard status` is misleading. It probes `/api/health`, which is auth-protected after setup, then prints `j.uptime`, but the real payload nests uptime under `system.uptime`. Production symptom: "Dashboard running" with `Uptime: unknown` even when the HTTP response is just `{"error":"Unauthorized"}`.
+- [bin/cli.js:177-179] The `setup` command sets `FORCE_SETUP=1`, but `server.js` never reads it. The command is effectively identical to `start`.
+- [public/setup.html:207-208, 460-466, server.js:3176] Password policy is both weak and inconsistent. Setup allows 4-character passwords, but the change-password API later requires 6 characters. Suggested fix: pick one strong minimum everywhere.
+- [public/setup.html:478-490, 575-582] The setup page injects raw form and health-check values into `innerHTML`. A crafted path/service name can break the DOM or execute script in the browser before auth is configured. Suggested fix: render summaries with `textContent`.
+- [public/live.html:177-189, public/agents-control.html:180-182] `agents-control.html` links to `/live.html?session=...`, but `live.html` never reads that query param. Production symptom: clicking "View" does not open the intended session.
+- [public/files.html:329-344, public/memory.html:164-166] The memory page sends users to `/files.html?open=...`, but the files page never consumes `?open=`. Production symptom: the "Open" button does not open the selected file.
+- [public/memory.html:147-169, 194-205] The page promises "semantic" search and neural concept stats, but it actually calls text grep (`/api/workspace/search`) and displays `data.concepts`, which the backend never returns. Production symptom: search quality is poor and "Concepts" always shows `0`.
+- [public/alerts.html:148-152, server.js:3502-3517] The alerts page is largely a stub. The backend only stores `alerts-config.json`; there is no alert scheduler, delivery worker, log API, or recent-alert feed. Production symptom: users can save thresholds but never see any alerts fire.
+- [public/logs.html:193-197] Service tabs are hard-coded to `openclaw`, `clawdbot-dashboard`, `cloudflared-dashboard`, `searxng`, and `ollama`, even though the backend allows configurable service names. Production symptom: after saving custom service names in settings, the logs page still points at the old tabs.
+- [public/mail.html:749-764] The mail list renderer duplicates nearly identical HTML generation twice (`loadEmails` and `silentRefresh`) and inserts `e.date` unescaped into HTML. This is mostly maintainability debt, but it is also an avoidable DOM-injection surface.
 
-### 1. Command Injection in Cron CRUD (server.js:579-584)
-User input (`name`, `schedule`, `message`, `description`) is interpolated into shell commands with only `"` escaping. Backticks, `$()`, and `\n` bypass this:
-```js
-let cmd = `openclaw cron add --name "${name.replace(/"/g, '\\"')}" --schedule "${schedule}"...`
-```
-**Fix:** Use `execFile` with array args, or validate inputs against strict patterns (alphanumeric + safe chars only).
+## Low Priority (polish)
+- [server.js:5] `spawn` is imported but unused.
+- [server.js:3448-3484] `GET /api/live/session` does not clamp `limit`; a large query can force much bigger reads than the UI ever needs.
+- [public/settings.html:1119] `showTestToast` uses `innerHTML`; the success path escapes data, but the error path passes raw `d.error`/`e.message`. Safer to build the toast with text nodes.
+- [public/*] Mobile-nav logic is duplicated in almost every page (`toggleMobileNav()` with slightly different selectors). This is easy to drift and hard to fix globally.
+- [public/*] Many pages rely on large inline-style HTML strings, which makes escaping mistakes and API drift much easier than componentized rendering.
 
-### 2. Command Injection in Cron Enable/Disable/Run/Delete (server.js:612-637)
-`req.params.id` is passed directly to shell commands with NO validation:
-```js
-const result = exec(`openclaw cron enable ${req.params.id} 2>&1`);
-const result = exec(`openclaw cron rm ${req.params.id} --yes 2>&1`);
-```
-**Fix:** Validate cron ID against `/^[a-zA-Z0-9_-]+$/` before using in commands.
+## Per-Page Notes
 
-### 3. Missing Body Parsers on Cron Routes (server.js:575-637)
-`POST /api/crons`, `PUT /api/crons/:id` etc. read `req.body` but have no `express.json()` middleware. `req.body` is always `undefined`:
-```js
-app.post('/api/crons', (req, res) => {
-  const { name, description, schedule } = req.body; // undefined!
-```
-**Fix:** Add `express.json()` to each route, or add `app.use(express.json())` globally.
+### server.js
+- [56-60] Insecure default session config: fallback secret, insecure cookies, default MemoryStore.
+- [79-87] Setup APIs are fully unauthenticated before bootstrap.
+- [103-110] `next` redirect is trusted without validation.
+- [154-167] Public append-only log endpoints can be abused for spam and blocking I/O.
+- [575-639] Cron create/edit/delete routes are missing `express.json()`, use shell interpolation, and call nonexistent `cache.delete`.
+- [1291-1330] Session detail returns the oldest 100 messages, not the newest.
+- [1384-1418] "Kill" hides a session; it does not terminate it.
+- [1789-1803] OpenRouter key fallback is malformed and silently broken.
+- [2182-2205] Provider health checks mis-detect auth failures as healthy.
+- [2740-2833] Workspace listing/search are much narrower than the UI implies.
+- [2890-2918] Tunnel ID and public URLs are hard-coded to one environment.
+- [2928-2939] Cache stats disk commands contain malformed template literals.
+- [3173-3247] Setup claims no restart is needed even though most derived paths are already frozen.
+- [3254-3310] Setup install shells out with unescaped `openclawHome`.
+- [3521-3538] File save writes to disk, then throws on `cache.clear()`.
 
-### 4. `cache.delete()` doesn't exist — should be `cache.del()` (server.js:585,604,613,622,638...)
-TTLCache has `.del(k)` method, but code calls `.delete()` which is undefined (no-op):
-```js
-cache.delete('crons_simple'); // silently does nothing
-```
-12+ occurrences. Cache never invalidates after cron operations.
-**Fix:** Change all `cache.delete(...)` to `cache.del(...)`.
+### bin/cli.js
+- [119-128] `--port` and `--host` are ignored by the server because `server.js` hardcodes its bind settings.
+- [148-159] `status` checks an auth-protected route and reads the wrong uptime field.
+- [177-179] `FORCE_SETUP` is dead code; `setup` does not actually force setup mode.
 
-### 5. `cache.clear()` doesn't exist (server.js:3540)
-Same issue — `cache.clear()` after workspace file save does nothing.
-**Fix:** Add a `clear()` method to TTLCache, or call `.del()` on specific keys.
+### index.html
+- [1044-1052, 1378-1418] The dashboard mostly works, but several cards inherit backend misreports from `/api/health/providers` and `/api/network/status`.
+- [1218-1223] Budget banners are inserted with `innerHTML`; current data is numeric, but safer rendering would reduce future XSS risk.
 
-### 6. Hardcoded PORT=3000, env var ignored (server.js:36)
-```js
-const PORT = 3000;
-```
-`process.env.PORT` is never read. The `--port` CLI flag and `PORT` env var have no effect.
-**Fix:** `const PORT = parseInt(process.env.PORT) || 3000;`
+### agents.html
+- [1217-1237] Session rows and action buttons embed raw IDs/keys inside inline `onclick` handlers; `escapeHtml()` is not sufficient for JavaScript-string contexts.
+- [1335-1339, 1418-1423, 1589-1595] Cron/live controls rely on current APIs, but inline handler construction with `j.id`, `j.name`, and `s.key` is fragile and XSS-prone if any value contains quotes.
+- [1376-1378, 1400-1401] Error text is written into `innerHTML` without escaping.
 
----
+### agents-control.html
+- [147-176] Session labels, origins, and types are written into HTML without escaping.
+- [161-163] `viewLive()` and `openSteer()` use raw keys in inline handlers.
+- [181-182] The `?session=` deep link points at a live page feature that does not exist.
 
-## 🟠 High Priority (should fix)
+### alerts.html
+- [148-152] "Recent Alerts" is static placeholder content; the page never fetches alert history.
+- [183-214] The page only saves JSON config. There is no backend job that evaluates thresholds or sends notifications.
 
-### 7. XSS via innerHTML in 8+ pages
-Session names, agent tasks, file paths, and search results from the backend are inserted via `innerHTML` without escaping:
-- `agents-control.html`: 3 innerHTML, 0 escapeHtml
-- `channels.html`: 7 innerHTML, 0 escapeHtml  
-- `conv-analytics.html`: 3 innerHTML, 0 escapeHtml
-- `analytics.html`: 2 innerHTML, 0 escapeHtml
-- `agents.html`: 20+ innerHTML including error messages
+### analytics.html
+- [114-123] Expects `data.sessions`, `data.models`, and `data.daily`, but the backend returns different keys.
+- [117] `textContent = data.sessions` coerces an array into `[object Object]`.
+- [176-182] Reads hourly data as `data[h]` instead of `data.hourBuckets[h]`.
 
-**Fix:** Add `escapeHtml()` function to all pages (like `live.html` and `memory.html` already have), use it for all dynamic content.
+### channels.html
+- [149-166] Expects `data.providers` array; current backend returns a keyed object, so the provider section falls into the error state.
+- [169-181] Expects `data.tunnel.status` and `data.dns`, but backend returns `tunnel.active`, `arc`, and `dashboard`.
 
-### 8. Path Traversal in Workspace Search (server.js:2794+)
-While `..` is blocked in `/api/workspace/file`, the search endpoint uses `grep` with user query:
-```js
-const raw = exec(`grep -rni "${safeQuery}" ${WORKSPACE} ...`);
-```
-Even with character filtering, symlinks inside WORKSPACE could escape the boundary.
-**Fix:** Resolve absolute path and verify it starts with WORKSPACE after resolution.
+### conv-analytics.html
+- [138-158] Creates charts without reusing/destroying chart instances if the function is ever called again.
+- [170-183] Misreads `/api/sessions/hourly`; the heatmap and chart use the wrong shape and can produce all-zero or `NaN` output.
 
-### 9. No CSRF Protection
-All state-changing operations (POST/PUT/DELETE) have no CSRF tokens. Since session cookies are used, any site could make cross-origin requests to the dashboard.
-**Fix:** Add CSRF middleware (e.g., `csurf`) or use `SameSite=Strict` on session cookie.
+### crons.html
+- [222-229] `switchTab()` depends on implicit global `event`, which is brittle outside legacy inline-handler behavior.
+- [294-333] Cron cards render raw IDs/names into inline handlers.
+- [430-449] Heartbeat read/write calls nonexistent `/api/files/read` and `/api/files/write` endpoints, so the editor cannot load or save real data.
 
-### 10. Default Session Secret (server.js:57)
-```js
-secret: process.env.SESSION_SECRET || 'change-me-in-production'
-```
-If no env var is set, all sessions use a known secret. Setup wizard generates a random one, but users who skip setup or use `openclaw-dashboard start` directly get the default.
-**Fix:** Auto-generate and persist a random secret on first run if not configured.
+### files.html
+- [195-208, 338-340] File paths are inserted into inline `onclick` handlers without JS-string escaping.
+- [302-318] Markdown preview allows unsafe `href` values such as `javascript:`.
+- [329-344] Search results show only `md/json` matches because the backend search is narrower than the editor UI.
+- [1-359] The page never reads `?open=...`, so deep links from `memory.html` do nothing.
 
-### 11. Mobile Debug Log — Unauthenticated Write (server.js:154-157)
-```js
-app.post('/api/mobile-log', express.json(), (req, res) => {
-  fs.appendFileSync(path.join(WORKSPACE, 'tradeiators/mobile-debug.log'), entry);
-```
-Unauthenticated endpoint writes arbitrary JSON to disk. Can fill disk or write misleading data. Also hardcoded to `tradeiators/` path — won't exist on other installs.
-**Fix:** Remove or gate behind auth. At minimum, add rate limiting and size cap.
+### identity.html
+- [680-706, 846-866] File paths are written into inline handlers with HTML escaping, not JavaScript escaping; apostrophes can break the handler.
+- [756-757, 866] The page relies heavily on `innerHTML`, so any escaping regression in the markdown renderer becomes high impact.
 
-### 12. Contact Form — Unauthenticated Write (server.js:161-167)
-Similar to above — writes to `arc-consultancy/inquiries.log`. Path is hardcoded and specific to one install.
-**Fix:** Make configurable or remove. Add rate limiting.
+### live.html
+- [165-169] Session keys are embedded raw into inline `onclick`.
+- [177-189] The page ignores the `?session=` parameter entirely.
+- [193-203] Polling keeps running indefinitely once a session is selected; there is no visibility/unload cleanup.
 
-### 13. VIS-Specific Code in Generic Package (server.js:725-755)
-SQL Server connection, VIS database queries, `pymssql` — all hardcoded for one specific deployment. Will error on every other install.
-**Fix:** Move behind feature flag or plugin system. Return `{unavailable: true}` if VIS env vars not set.
+### login.html
+- [236-248] The form posts to `/login` and drops any `next` value from the original redirect URL.
+- [254-258] Only the error banner is client-side; there is no client-side rate-limit UX or lockout indicator for repeated failures.
 
----
+### logs.html
+- [193-197] Service tabs are hard-coded and can drift from saved dashboard settings.
+- [332-349] Log fetch errors are displayed, but there is no handling for 401/redirect responses beyond generic error text.
 
-## 🟡 Medium Priority (nice to fix)
+### mail.html
+- [749-764] Mail list HTML is duplicated twice, increasing drift risk.
+- [749, 764] `e.date` is inserted unescaped into HTML.
+- [747-810] Auto-refresh never invalidates `emailCache`, so changed message contents remain stale until reload.
 
-### 14. Full Session Files Read Into Memory (server.js:940-1050)
-`/api/orchestration/sessions` reads ALL .jsonl files (last 30 days) entirely into memory, parsing every line:
-```js
-const rawContent = fs.readFileSync(fullPath, 'utf8').trim();
-const lines = rawContent.split('\n');
-```
-With many sessions or large logs, this can use 100s of MB of RAM.
-**Fix:** Use streaming/tail approach (already have `tailLinesSync`), or read only first/last N lines per file.
+### memory.html
+- [153-169] Search is plain text grep despite the "semantic" wording.
+- [164-165, 185-187] File paths are embedded into inline handlers without JS-string escaping.
+- [165] "Open" deep-links to `/files.html?open=...`, but the target page ignores it.
+- [201-205] `data.concepts` is not returned by the backend, so the Concepts stat is always `0`.
 
-### 15. Synchronous File I/O Everywhere
-Every API route uses `fs.readFileSync`, `execSync`, `fs.writeFileSync`. Under concurrent requests, the event loop blocks.
-**Fix:** For MVP this is acceptable, but add `async/await` with `fs.promises` for high-traffic routes.
+### neural.html
+- [1212, 1239, 1264-1269, 1532-1539] DB-derived fields are concatenated into `innerHTML` without escaping.
+- [1398-1511, 1593-1600] The page rebuilds a large graph on a 30-second interval, which is expensive on weaker devices and can cause jank.
 
-### 16. ARC Website Routing Hardcoded (server.js:136-150)
-```js
-const ARC_HOSTS = ['arc.net.pk', 'www.arc.net.pk'];
-```
-Hardcoded domain routing for a specific website. Other users get unexpected behavior.
-**Fix:** Make virtual host routing configurable, or disable if ARC_SITE directory doesn't exist.
+### responsive.css
+- [207-249] There is an unmatched `}` at line 249.
+- [189-192] Global `button` rules are very broad and can override page-specific sizing unexpectedly.
 
-### 17. `agents-control.html` — Steer API May Not Work
-`POST /api/agent/steer` writes to a JSON file, but nothing reads it back. The agent won't see steer requests.
-**Fix:** Either use OpenClaw's actual `sessions_send` mechanism, or document that steer is a placeholder.
+### settings.html
+- [1102-1105] Model/provider rendering still trusts current backend shapes and injects values into inline handlers.
+- [1119] `showTestToast()` uses `innerHTML`; the error path is not escaped.
+- [1241-1288] Feature toggles are inferred from detected binaries, not persisted dashboard feature config, so the page can show features as enabled when they are merely installed.
+- [1316-1338] The UI warns that restart is required, but many backend routes still use frozen startup constants and some settings (port/host) never apply even after restart.
 
-### 18. `conv-analytics.html` — Missing `origin` and `chatType` Fields
-The page assumes sessions have `origin` and `chatType` properties from `/api/live/sessions`, but sessions.json doesn't typically contain these. All sessions likely show as "unknown" channel.
-**Fix:** Parse channel info from session keys (e.g., `agent:voice:whatsapp:...` → whatsapp).
-
-### 19. `memory.html` — Search Calls Non-Existent API
-`/api/workspace/search` exists but returns grep results with `{file, line}` format. The frontend expects `{results: [{file, line, text}]}`:
-```js
-data.results.forEach(function(r) { ... r.file + ':' + r.line ... });
-```
-Need to verify API response shape matches frontend expectations.
-
-### 20. `analytics.html` — API Endpoints May Not Exist
-References `/api/costs/summary`, `/api/costs/by-model`, `/api/sessions/hourly`, `/api/sessions/errors-summary`. Need to verify these all exist in server.js.
-
-### 21. `alerts.html` — Alert System is Config-Only
-Save/load works, but nothing actually monitors thresholds or sends alerts. It's a UI without a backend engine.
-**Fix:** Document as "coming soon" or implement a heartbeat-based alerting loop.
-
-### 22. Neural DB Path Hardcoded (server.js:43)
-```js
-const NEURAL_DB_PATH = path.resolve(os.homedir(), '.neuralmemory/brains/default.db');
-```
-Not configurable via env var. Different nmem installations may use different paths.
-**Fix:** Add `NEURAL_DB_PATH` env var option.
-
-### 23. Setup Wizard — Overwrites .env Completely (server.js:3234-3240)
-The setup save endpoint writes a fresh `.env`, losing any custom env vars the user had:
-```js
-fs.writeFileSync(envPath, envLines.join('\n') + '\n');
-```
-**Fix:** Merge with existing .env instead of overwriting.
-
----
-
-## 🔵 Low Priority (polish)
-
-### 24. No Rate Limiting
-No rate limiting on login attempts or API calls. Brute-force attacks possible.
-
-### 25. Inconsistent Error Responses
-Some routes return `{error: "msg"}`, others return `{ok: false, error: "msg"}`, others use HTTP status codes. No consistent error format.
-
-### 26. Dead Code — Duplicate Mobile-Log Route
-Comment at server.js:3580 mentions a removed duplicate, but the original unauthenticated route at line 154 is still there.
-
-### 27. `bin/cli.js` — Install Command Copies Files Naively
-The `install` command copies files one by one with `fs.copyFileSync`. If the npm package adds new files, the install command won't know about them.
-**Fix:** Use `fs.cpSync` (recursive) or rsync approach.
-
-### 28. `responsive.css` — Hamburger Menu Inconsistency
-Some pages have `toggleMobileNav()` inline, others don't. Menu toggle behavior varies across pages.
-
-### 29. No 404 Page
-Missing routes fall through to Express's default handler. Custom 404 page would match the theme.
-
-### 30. `index.html` — Old `agents.html` Link
-```html
-<a href="/agents.html" class="nav-link">🎛️ Agents</a>
-```
-Should point to `/agents-control.html` (both exist but serve different purposes — confusing).
-
-### 31. HTTP Only — No HTTPS Config
-Dashboard only listens on HTTP. In production, relies on reverse proxy (Cloudflare tunnel) for HTTPS. If accessed directly, cookies and passwords travel in cleartext.
-
-### 32. Session Store is In-Memory
-Express sessions use the default MemoryStore. Server restart = all users logged out. Not suitable for production with multiple workers.
-
-### 33. No Health Check for Dependencies
-`/api/health` checks system metrics but not critical dependencies (SQLite access, session dir readability, OpenClaw process health).
-
----
-
-## Per-Page Summary
-
-| Page | Issues | Severity |
-|------|--------|----------|
-| `server.js` | Command injection (×2), missing body parsers, cache.delete bug, hardcoded port, sync I/O, VIS-specific code | Critical |
-| `agents-control.html` | XSS via innerHTML, steer API placeholder | High |
-| `agents.html` | 20+ innerHTML without escaping, error messages in HTML | High |
-| `analytics.html` | Missing escapeHtml, unclear API dependency | Medium |
-| `channels.html` | 7 innerHTML without escaping | High |
-| `conv-analytics.html` | Missing origin/chatType data, XSS | Medium |
-| `memory.html` | Search API shape mismatch | Medium |
-| `alerts.html` | Config-only, no backend engine | Medium |
-| `crons.html` | Depends on broken cron CRUD routes | Critical |
-| `live.html` | Decent — has escapeHtml ✅ | Low |
-| `login.html` | No rate limiting, no CSRF | Medium |
-| `setup.html` | Overwrites .env | Medium |
-| `settings.html` | Large file (1364 lines), otherwise OK | Low |
-| `files.html` | OK — path validation present ✅ | Low |
-| `identity.html` | OK | Low |
-| `neural.html` | OK — graceful degradation ✅ | Low |
-| `mail.html` | OK — folder allowlist ✅ | Low |
-| `logs.html` | OK | Low |
-| `index.html` | Old agents.html link | Low |
-| `responsive.css` | Hamburger inconsistency across pages | Low |
-| `bin/cli.js` | Naive file copy in install | Low |
-
----
-
-## Top 5 Fixes (Biggest Impact)
-
-1. **Fix PORT** — one-liner, unblocks `--port` and env var (line 36)
-2. **Fix `cache.delete` → `cache.del`** — find-replace, unbreaks all cache invalidation (12 occurrences)
-3. **Add body parsers to cron routes** — cron CRUD is completely broken without them
-4. **Validate cron IDs** — regex check before shell exec prevents injection
-5. **Add `escapeHtml` to all pages** — prevents XSS across the board
+### setup.html
+- [207-208, 460-466] Weak 4-character password policy.
+- [478-490] Summary panel writes raw user input into `innerHTML`.
+- [543-588] Install progress never clears `healthGrid` before appending, so re-running setup duplicates status cards.
+- [575-582] Health-check names/details are rendered with `innerHTML` without escaping.
