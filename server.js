@@ -3419,6 +3419,65 @@ app.get('/setup', (req, res) => {
   res.sendFile('setup.html', { root: path.join(__dirname, 'public') });
 });
 
+// ── Live Session Viewer APIs ──────────────────────────────────────────
+// GET /api/live/sessions — list all sessions from sessions.json
+app.get('/api/live/sessions', requireAuth, (req, res) => {
+  try {
+    const OPENCLAW_HOME = process.env.OPENCLAW_HOME || path.resolve(os.homedir(), '.openclaw');
+    const AGENT = process.env.OPENCLAW_AGENT || 'voice';
+    const sjPath = path.join(OPENCLAW_HOME, 'agents', AGENT, 'sessions', 'sessions.json');
+    const data = JSON.parse(fs.readFileSync(sjPath, 'utf8'));
+    const sessions = Object.entries(data).map(([key, val]) => ({
+      key,
+      sessionId: val.sessionId,
+      updatedAt: val.updatedAt ? new Date(val.updatedAt).toISOString() : null,
+      chatType: val.chatType || 'unknown',
+      origin: val.origin ? val.origin.surface : null,
+      lastTo: val.lastTo || null
+    })).sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || ''));
+    res.json(sessions);
+  } catch (e) { res.json([]); }
+});
+
+// GET /api/live/session?key=...&limit=100 — read session log
+app.get('/api/live/session', requireAuth, (req, res) => {
+  try {
+    const OPENCLAW_HOME = process.env.OPENCLAW_HOME || path.resolve(os.homedir(), '.openclaw');
+    const AGENT = process.env.OPENCLAW_AGENT || 'voice';
+    const sjPath = path.join(OPENCLAW_HOME, 'agents', AGENT, 'sessions', 'sessions.json');
+    const data = JSON.parse(fs.readFileSync(sjPath, 'utf8'));
+    const key = req.query.key;
+    const limit = parseInt(req.query.limit) || 100;
+    if (!key || !data[key]) return res.json({ error: 'Session not found' });
+    const entry = data[key];
+    const logFile = entry.sessionFile;
+    if (!logFile || !fs.existsSync(logFile)) return res.json({ error: 'Session log not found', updatedAt: entry.updatedAt ? new Date(entry.updatedAt).toISOString() : null });
+    const content = fs.readFileSync(logFile, 'utf8');
+    const lines = content.trim().split('\n');
+    const messages = [];
+    for (const line of lines.slice(-limit * 2)) { // read more lines than needed, filter later
+      try {
+        const obj = JSON.parse(line);
+        if (obj.type === 'message' || obj.type === 'custom') {
+          messages.push({
+            type: obj.type,
+            role: obj.message ? obj.message.role : obj.type,
+            message: obj.message,
+            timestamp: obj.timestamp || (obj.message && obj.message.timestamp),
+          });
+        }
+      } catch {}
+    }
+    res.json({
+      key,
+      sessionId: entry.sessionId,
+      updatedAt: entry.updatedAt ? new Date(entry.updatedAt).toISOString() : null,
+      chatType: entry.chatType,
+      messages: messages.slice(-limit)
+    });
+  } catch (e) { res.json({ error: e.message }); }
+});
+
 // POST /api/workspace/file — save file content
 app.post('/api/workspace/file', express.json({ limit: '1mb' }), requireAuth, (req, res) => {
   const { path: relPath, content } = req.body || {};

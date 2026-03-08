@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Channels & Services — OpenClaw Dashboard</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/responsive.css">
+  <style>
+    *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+    :root{--bg:#0a0e17;--bg2:#0f1420;--glass:rgba(255,255,255,.03);--border:rgba(255,255,255,.08);--text:#f1f5f9;--text2:#94a3b8;--muted:#64748b;--cyan:#06b6d4;--purple:#8b5cf6;--green:#10b981;--amber:#f59e0b;--red:#f43f5e;--gradient:linear-gradient(135deg,#06b6d4,#8b5cf6,#ec4899)}
+    body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);font-size:14px;min-height:100vh}
+    .topbar{background:var(--bg2);border-bottom:1px solid var(--border);padding:12px 24px;display:flex;align-items:center;justify-content:space-between}
+    .topbar h1{font-size:18px;font-weight:700;background:var(--gradient);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+    .topbar .nav{display:flex;gap:12px;align-items:center}
+    .topbar .nav a{color:var(--text2);text-decoration:none;font-size:13px;padding:6px 12px;border-radius:6px;transition:all .2s}
+    .topbar .nav a:hover{background:var(--glass);color:var(--text)}
+    .content{padding:20px 24px;max-width:1200px;margin:0 auto}
+    h2{font-size:16px;font-weight:700;margin:24px 0 12px;display:flex;align-items:center;gap:8px}
+    h2:first-child{margin-top:0}
+    .card-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
+    .status-card{background:var(--glass);border:1px solid var(--border);border-radius:12px;padding:18px;transition:all .2s}
+    .status-card:hover{border-color:rgba(255,255,255,.12)}
+    .card-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+    .card-header .name{font-weight:600;font-size:14px;display:flex;align-items:center;gap:8px}
+    .status-dot{width:10px;height:10px;border-radius:50%;display:inline-block}
+    .dot-active{background:var(--green);box-shadow:0 0 8px rgba(16,185,129,.5)}
+    .dot-inactive{background:var(--red);box-shadow:0 0 8px rgba(244,63,94,.3)}
+    .dot-unknown{background:var(--muted)}
+    .dot-warning{background:var(--amber);box-shadow:0 0 8px rgba(245,158,11,.3)}
+    .card-detail{font-size:12px;color:var(--text2);display:flex;flex-direction:column;gap:4px}
+    .card-detail .row{display:flex;justify-content:space-between}
+    .card-detail .row .lbl{color:var(--muted)}
+    .provider-card{display:flex;align-items:center;gap:14px;background:var(--glass);border:1px solid var(--border);border-radius:12px;padding:14px 18px}
+    .provider-card .icon{font-size:24px;width:40px;height:40px;display:flex;align-items:center;justify-content:center;border-radius:8px;background:rgba(255,255,255,.03)}
+    .provider-card .info{flex:1}
+    .provider-card .info .name{font-weight:600;font-size:13px}
+    .provider-card .info .detail{font-size:11px;color:var(--text2)}
+    .provider-card .status{font-size:12px;font-weight:600}
+    .status-ok{color:var(--green)}
+    .status-error{color:var(--red)}
+    .status-unchecked{color:var(--muted)}
+    .refresh-btn{padding:6px 14px;background:rgba(6,182,212,.15);color:var(--cyan);border:1px solid rgba(6,182,212,.3);border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit}
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <h1>🔌 Channels & Services</h1>
+    <button class="mobile-menu-btn" onclick="toggleMobileNav()">☰</button>
+    <div class="mobile-overlay" onclick="toggleMobileNav()"></div>
+    <div class="nav">
+      <a href="/">← Dashboard</a>
+      <a href="/live.html">Live</a>
+      <a href="/analytics.html">Analytics</a>
+      <a href="/settings.html">Settings</a>
+      <a href="/logout" style="color:var(--red)">Logout</a>
+    </div>
+  </div>
+
+  <div class="content">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <h2 style="margin:0">📡 Channel Status</h2>
+      <button class="refresh-btn" onclick="loadAll()">🔄 Refresh</button>
+    </div>
+    <div class="card-grid" id="channelCards">
+      <div class="status-card"><div style="color:var(--muted)">Loading channels...</div></div>
+    </div>
+
+    <h2>⚙️ System Services</h2>
+    <div class="card-grid" id="serviceCards">
+      <div class="status-card"><div style="color:var(--muted)">Loading services...</div></div>
+    </div>
+
+    <h2>🧠 AI Providers</h2>
+    <div class="card-grid" id="providerCards">
+      <div class="status-card"><div style="color:var(--muted)">Loading providers...</div></div>
+    </div>
+
+    <h2>🌐 Network</h2>
+    <div class="card-grid" id="networkCards">
+      <div class="status-card"><div style="color:var(--muted)">Loading...</div></div>
+    </div>
+  </div>
+
+<script>
+function toggleMobileNav(){
+  document.querySelector('.nav').classList.toggle('open');
+  var o=document.querySelector('.mobile-overlay');o.classList.toggle('open');
+  o.style.display=o.classList.contains('open')?'block':'none';
+}
+
+function dotClass(state) {
+  if (state === 'active' || state === 'running' || state === 'connected' || state === 'ok') return 'dot-active';
+  if (state === 'inactive' || state === 'failed' || state === 'error' || state === 'disconnected') return 'dot-inactive';
+  if (state === 'activating' || state === 'deactivating' || state === 'degraded') return 'dot-warning';
+  return 'dot-unknown';
+}
+
+function loadChannels() {
+  // Derive channel info from sessions.json — which channels have sessions
+  fetch('/api/live/sessions').then(function(r){return r.json()}).then(function(sessions) {
+    var channels = {};
+    sessions.forEach(function(s) {
+      var origin = s.origin || 'unknown';
+      if (!channels[origin]) channels[origin] = {count:0, lastActive:null, chatTypes:new Set()};
+      channels[origin].count++;
+      channels[origin].chatTypes.add(s.chatType);
+      if (!channels[origin].lastActive || s.updatedAt > channels[origin].lastActive) {
+        channels[origin].lastActive = s.updatedAt;
+      }
+    });
+    var icons = {whatsapp:'📱',telegram:'✈️',discord:'🎮',signal:'🔐',irc:'💬',slack:'💼',googlechat:'🔵',imessage:'🍎'};
+    var html = '';
+    Object.keys(channels).sort().forEach(function(ch) {
+      var c = channels[ch];
+      var age = c.lastActive ? formatAge(c.lastActive) : 'never';
+      var isRecent = c.lastActive && (Date.now() - new Date(c.lastActive).getTime() < 600000);
+      html += '<div class="status-card">' +
+        '<div class="card-header"><div class="name"><span class="status-dot ' + (isRecent?'dot-active':'dot-warning') + '"></span>' +
+        (icons[ch]||'📡') + ' ' + ch.charAt(0).toUpperCase()+ch.slice(1) + '</div></div>' +
+        '<div class="card-detail">' +
+        '<div class="row"><span class="lbl">Sessions</span><span>' + c.count + '</span></div>' +
+        '<div class="row"><span class="lbl">Last active</span><span>' + age + '</span></div>' +
+        '<div class="row"><span class="lbl">Types</span><span>' + Array.from(c.chatTypes).join(', ') + '</span></div>' +
+        '</div></div>';
+    });
+    if (!html) html = '<div class="status-card"><div style="color:var(--muted)">No channels detected</div></div>';
+    document.getElementById('channelCards').innerHTML = html;
+  });
+}
+
+function loadServices() {
+  fetch('/api/logs/services-status').then(function(r){return r.json()}).then(function(data) {
+    var svcs = data.services || {};
+    var html = '';
+    Object.keys(svcs).forEach(function(svc) {
+      var state = svcs[svc];
+      html += '<div class="status-card">' +
+        '<div class="card-header"><div class="name"><span class="status-dot ' + dotClass(state) + '"></span>⚙️ ' + svc + '</div></div>' +
+        '<div class="card-detail"><div class="row"><span class="lbl">State</span><span style="font-weight:600;color:' + (state==='active'?'var(--green)':'var(--red)') + '">' + state + '</span></div>' +
+        '<div class="row"><span class="lbl">Checked</span><span>' + (data.checkedAt ? new Date(data.checkedAt).toLocaleTimeString() : '-') + '</span></div>' +
+        '</div></div>';
+    });
+    if (!html) html = '<div class="status-card"><div style="color:var(--muted)">No services configured</div></div>';
+    document.getElementById('serviceCards').innerHTML = html;
+  }).catch(function(){ document.getElementById('serviceCards').innerHTML = '<div class="status-card"><div style="color:var(--red)">Failed to load</div></div>'; });
+}
+
+function loadProviders() {
+  fetch('/api/health/providers').then(function(r){return r.json()}).then(function(data) {
+    var providers = data.providers || [];
+    var html = '';
+    var icons = {anthropic:'🤖',openai:'🟢',openrouter:'🔀',ollama:'🦙',google:'🔵'};
+    providers.forEach(function(p) {
+      var name = p.name || p.provider || 'Unknown';
+      var icon = icons[name.toLowerCase()] || '🧠';
+      var ok = p.status === 'ok' || p.healthy;
+      html += '<div class="provider-card">' +
+        '<div class="icon">' + icon + '</div>' +
+        '<div class="info"><div class="name">' + name + '</div>' +
+        '<div class="detail">' + (p.model || p.details || '') + '</div></div>' +
+        '<div class="status ' + (ok?'status-ok':'status-error') + '">' + (ok?'✓ OK':'✗ Error') + '</div></div>';
+    });
+    if (!html) html = '<div class="status-card"><div style="color:var(--muted)">No providers detected</div></div>';
+    document.getElementById('providerCards').innerHTML = html;
+  }).catch(function(){ document.getElementById('providerCards').innerHTML = '<div class="status-card"><div style="color:var(--muted)">Provider check unavailable</div></div>'; });
+}
+
+function loadNetwork() {
+  fetch('/api/network/status').then(function(r){return r.json()}).then(function(data) {
+    var html = '';
+    if (data.tunnel) {
+      html += '<div class="status-card"><div class="card-header"><div class="name"><span class="status-dot ' + dotClass(data.tunnel.status) + '"></span>🌐 Cloudflare Tunnel</div></div>' +
+        '<div class="card-detail"><div class="row"><span class="lbl">Status</span><span>' + (data.tunnel.status || 'unknown') + '</span></div></div></div>';
+    }
+    if (data.dns) {
+      html += '<div class="status-card"><div class="card-header"><div class="name"><span class="status-dot dot-active"></span>🔗 DNS</div></div>' +
+        '<div class="card-detail"><div class="row"><span class="lbl">Resolver</span><span>' + (data.dns || '-') + '</span></div></div></div>';
+    }
+    if (!html) html = '<div class="status-card"><div style="color:var(--muted)">Network info unavailable</div></div>';
+    document.getElementById('networkCards').innerHTML = html;
+  }).catch(function(){ document.getElementById('networkCards').innerHTML = '<div class="status-card"><div style="color:var(--muted)">Network check failed</div></div>'; });
+}
+
+function formatAge(ts) {
+  var ms = Date.now() - new Date(ts).getTime();
+  var m = Math.floor(ms/60000);
+  if (m < 1) return 'just now';
+  if (m < 60) return m + 'm ago';
+  var h = Math.floor(m/60);
+  if (h < 24) return h + 'h ago';
+  return Math.floor(h/24) + 'd ago';
+}
+
+function loadAll() { loadChannels(); loadServices(); loadProviders(); loadNetwork(); }
+loadAll();
+setInterval(loadAll, 30000);
+</script>
+</body>
+</html>

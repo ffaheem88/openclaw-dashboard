@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Live Sessions — OpenClaw Dashboard</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/responsive.css">
+  <style>
+    *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+    :root{--bg:#0a0e17;--bg2:#0f1420;--glass:rgba(255,255,255,.03);--border:rgba(255,255,255,.08);--text:#f1f5f9;--text2:#94a3b8;--muted:#64748b;--cyan:#06b6d4;--purple:#8b5cf6;--green:#10b981;--amber:#f59e0b;--red:#f43f5e;--gradient:linear-gradient(135deg,#06b6d4,#8b5cf6,#ec4899)}
+    body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);font-size:14px;min-height:100vh}
+    .topbar{background:var(--bg2);border-bottom:1px solid var(--border);padding:12px 24px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
+    .topbar h1{font-size:18px;font-weight:700;background:var(--gradient);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+    .topbar .nav{display:flex;gap:12px;align-items:center}
+    .topbar .nav a{color:var(--text2);text-decoration:none;font-size:13px;padding:6px 12px;border-radius:6px;transition:all .2s}
+    .topbar .nav a:hover{background:var(--glass);color:var(--text)}
+    .container{display:flex;height:calc(100vh - 53px)}
+    .session-list{width:300px;background:var(--bg2);border-right:1px solid var(--border);overflow-y:auto;flex-shrink:0}
+    .session-list-header{padding:12px 16px;border-bottom:1px solid var(--border);font-weight:600;font-size:13px;display:flex;justify-content:space-between;align-items:center}
+    .session-list-header .dot{width:8px;height:8px;border-radius:50%;display:inline-block}
+    .dot-live{background:var(--green);box-shadow:0 0 6px var(--green);animation:pulse 2s infinite}
+    .dot-idle{background:var(--amber)}
+    .dot-dead{background:var(--muted)}
+    @keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+    .sess-item{padding:12px 16px;border-bottom:1px solid var(--border);cursor:pointer;transition:all .15s}
+    .sess-item:hover{background:var(--glass)}
+    .sess-item.active{background:rgba(6,182,212,.08);border-left:3px solid var(--cyan)}
+    .sess-label{font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .sess-meta{font-size:11px;color:var(--muted);margin-top:3px;display:flex;gap:8px;align-items:center}
+    .viewer{flex:1;display:flex;flex-direction:column;overflow:hidden}
+    .viewer-header{padding:12px 20px;background:var(--bg2);border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+    .viewer-header .session-name{font-weight:600;font-size:14px}
+    .viewer-header .controls{display:flex;gap:8px}
+    .btn{padding:6px 14px;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .2s}
+    .btn-cyan{background:rgba(6,182,212,.15);color:var(--cyan);border:1px solid rgba(6,182,212,.3)}
+    .btn-red{background:rgba(244,63,94,.15);color:var(--red);border:1px solid rgba(244,63,94,.3)}
+    .messages{flex:1;overflow-y:auto;padding:16px 20px;display:flex;flex-direction:column;gap:8px}
+    .msg{padding:10px 14px;border-radius:10px;max-width:85%;font-size:13px;line-height:1.6;word-break:break-word}
+    .msg-user{background:rgba(6,182,212,.1);border:1px solid rgba(6,182,212,.15);align-self:flex-end;border-bottom-right-radius:2px}
+    .msg-assistant{background:var(--glass);border:1px solid var(--border);align-self:flex-start;border-bottom-left-radius:2px}
+    .msg-system{background:rgba(139,92,246,.08);border:1px solid rgba(139,92,246,.15);align-self:center;font-style:italic;color:var(--text2);font-size:12px}
+    .msg-tool{background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.15);align-self:flex-start;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--amber)}
+    .msg .role{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:4px;font-weight:700}
+    .msg .ts{font-size:10px;color:var(--muted);margin-top:4px;text-align:right}
+    .msg pre{background:rgba(0,0,0,.3);padding:8px;border-radius:4px;overflow-x:auto;margin:6px 0;font-size:11px}
+    .msg code{font-family:'JetBrains Mono',monospace;font-size:12px}
+    .empty-state{flex:1;display:flex;align-items:center;justify-content:center;flex-direction:column;color:var(--muted);gap:12px}
+    .empty-state .icon{font-size:48px;opacity:.3}
+    .stats-bar{padding:8px 20px;background:var(--bg2);border-top:1px solid var(--border);display:flex;gap:20px;font-size:12px;color:var(--text2)}
+    .stats-bar .stat{display:flex;align-items:center;gap:4px}
+    .stats-bar .stat-val{color:var(--text);font-weight:600}
+    .typing-indicator{padding:10px 14px;align-self:flex-start;color:var(--muted);font-size:12px;display:none}
+    .typing-indicator.visible{display:block}
+    .typing-indicator span{animation:blink 1.4s infinite;display:inline-block}
+    .typing-indicator span:nth-child(2){animation-delay:.2s}
+    .typing-indicator span:nth-child(3){animation-delay:.4s}
+    @keyframes blink{0%,100%{opacity:.2}50%{opacity:1}}
+    .auto-scroll-badge{position:fixed;bottom:60px;right:24px;background:var(--cyan);color:#000;padding:6px 14px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;display:none;z-index:50}
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <h1>🔴 Live Sessions</h1>
+    <button class="mobile-menu-btn" onclick="toggleMobileNav()">☰</button>
+    <div class="mobile-overlay" onclick="toggleMobileNav()"></div>
+    <div class="nav">
+      <a href="/">← Dashboard</a>
+      <a href="/agents.html">Agents</a>
+      <a href="/files.html">Files</a>
+      <a href="/crons.html">Crons</a>
+      <a href="/settings.html">Settings</a>
+      <a href="/logout" style="color:var(--red)">Logout</a>
+    </div>
+  </div>
+
+  <div class="container">
+    <div class="session-list" id="sessionList">
+      <div class="session-list-header">
+        <span>Sessions</span>
+        <span id="sessionCount" style="color:var(--muted)">0</span>
+      </div>
+      <div id="sessionItems" style="padding:20px;color:var(--muted);text-align:center;font-size:13px">Loading...</div>
+    </div>
+
+    <div class="viewer" id="viewer">
+      <div class="viewer-header" id="viewerHeader" style="display:none">
+        <div class="session-name" id="sessionName"></div>
+        <div class="controls">
+          <button class="btn btn-cyan" onclick="refreshSession()">🔄 Refresh</button>
+        </div>
+      </div>
+      <div class="messages" id="messages">
+        <div class="empty-state" id="emptyState">
+          <div class="icon">🔴</div>
+          <div>Select a session to view live messages</div>
+          <div style="font-size:12px">Sessions auto-refresh every 5 seconds</div>
+        </div>
+      </div>
+      <div class="typing-indicator" id="typingIndicator">
+        Agent is thinking<span>.</span><span>.</span><span>.</span>
+      </div>
+      <div class="stats-bar" id="statsBar" style="display:none">
+        <div class="stat">📨 Messages: <span class="stat-val" id="statMsgs">0</span></div>
+        <div class="stat">🔧 Tool calls: <span class="stat-val" id="statTools">0</span></div>
+        <div class="stat">⏱️ Last activity: <span class="stat-val" id="statActivity">-</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="auto-scroll-badge" id="scrollBadge" onclick="scrollToBottom()">↓ New messages</div>
+
+<script>
+var currentSession = null;
+var autoScroll = true;
+var pollInterval = null;
+var lastMsgCount = 0;
+
+function toggleMobileNav(){
+  document.querySelector('.nav').classList.toggle('open');
+  var o=document.querySelector('.mobile-overlay');
+  o.classList.toggle('open');
+  o.style.display=o.classList.contains('open')?'block':'none';
+}
+
+function formatAge(ts) {
+  if (!ts) return '-';
+  var ms = Date.now() - new Date(ts).getTime();
+  var s = Math.floor(ms/1000);
+  if (s < 60) return s + 's ago';
+  var m = Math.floor(s/60);
+  if (m < 60) return m + 'm ago';
+  var h = Math.floor(m/60);
+  if (h < 24) return h + 'h ago';
+  return Math.floor(h/24) + 'd ago';
+}
+
+function getStatusDot(updatedAt) {
+  if (!updatedAt) return '<span class="dot dot-dead"></span>';
+  var ms = Date.now() - new Date(updatedAt).getTime();
+  if (ms < 120000) return '<span class="dot dot-live"></span>';
+  if (ms < 600000) return '<span class="dot dot-idle"></span>';
+  return '<span class="dot dot-dead"></span>';
+}
+
+function escapeHtml(text) {
+  var div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+function loadSessions() {
+  fetch('/api/live/sessions').then(function(r){return r.json()}).then(function(data) {
+    var items = document.getElementById('sessionItems');
+    document.getElementById('sessionCount').textContent = data.length;
+    if (!data.length) {
+      items.innerHTML = '<div style="padding:20px;color:var(--muted);text-align:center;font-size:13px">No active sessions</div>';
+      return;
+    }
+    var html = '';
+    data.forEach(function(s) {
+      var active = currentSession === s.key ? ' active' : '';
+      var label = s.key.replace('agent:voice:','').replace('whatsapp:','📱 ').replace('telegram:','✈️ ').replace('discord:','🎮 ');
+      if (label.length > 35) label = label.substring(0,35) + '…';
+      html += '<div class="sess-item' + active + '" onclick="selectSession(\'' + s.key + '\')">' +
+        '<div class="sess-label">' + getStatusDot(s.updatedAt) + ' ' + escapeHtml(label) + '</div>' +
+        '<div class="sess-meta"><span>' + formatAge(s.updatedAt) + '</span>' +
+        (s.chatType ? '<span>' + s.chatType + '</span>' : '') +
+        '</div></div>';
+    });
+    items.innerHTML = html;
+  }).catch(function(){
+    document.getElementById('sessionItems').innerHTML = '<div style="padding:20px;color:var(--red)">Failed to load</div>';
+  });
+}
+
+function selectSession(key) {
+  currentSession = key;
+  document.getElementById('emptyState').style.display = 'none';
+  document.getElementById('viewerHeader').style.display = 'flex';
+  document.getElementById('statsBar').style.display = 'flex';
+  var label = key.replace('agent:voice:','');
+  document.getElementById('sessionName').textContent = label;
+  lastMsgCount = 0;
+  loadSessions(); // refresh active state
+  refreshSession();
+  if (pollInterval) clearInterval(pollInterval);
+  pollInterval = setInterval(refreshSession, 5000);
+}
+
+function refreshSession() {
+  if (!currentSession) return;
+  fetch('/api/live/session?key=' + encodeURIComponent(currentSession) + '&limit=100').then(function(r){return r.json()}).then(function(data) {
+    if (data.error) { document.getElementById('messages').innerHTML = '<div class="empty-state"><div>' + escapeHtml(data.error) + '</div></div>'; return; }
+    renderMessages(data.messages || []);
+    document.getElementById('statMsgs').textContent = (data.messages||[]).filter(function(m){return m.role!=='tool'}).length;
+    document.getElementById('statTools').textContent = (data.messages||[]).filter(function(m){return m.role==='tool'||m.type==='custom'}).length;
+    document.getElementById('statActivity').textContent = data.updatedAt ? formatAge(data.updatedAt) : '-';
+    // Typing indicator
+    var last = (data.messages||[])[(data.messages||[]).length-1];
+    var typing = last && last.role === 'user' && (Date.now() - new Date(data.updatedAt).getTime() < 30000);
+    document.getElementById('typingIndicator').classList.toggle('visible', !!typing);
+  });
+}
+
+function renderMessages(msgs) {
+  var container = document.getElementById('messages');
+  var html = '';
+  msgs.forEach(function(m) {
+    if (m.type === 'session' || m.type === 'model_change' || m.type === 'thinking_level_change') return;
+    var role = m.role || m.type || 'system';
+    var cls = 'msg-' + (role === 'user' ? 'user' : role === 'assistant' ? 'assistant' : role === 'tool' ? 'tool' : 'system');
+    var text = '';
+    if (typeof m.text === 'string') text = m.text;
+    else if (m.message && m.message.content) {
+      if (typeof m.message.content === 'string') text = m.message.content;
+      else if (Array.isArray(m.message.content)) {
+        text = m.message.content.filter(function(c){return c.type==='text'}).map(function(c){return c.text}).join('\n');
+      }
+    }
+    if (!text && m.type === 'custom') text = JSON.stringify(m, null, 2);
+    if (!text) return;
+    // Truncate very long messages
+    var truncated = text.length > 2000;
+    if (truncated) text = text.substring(0, 2000);
+    // Strip metadata prefixes for cleaner display
+    text = text.replace(/^Conversation info \(untrusted.*?\n```json\n[\s\S]*?```\n\n?/m, '');
+    text = text.replace(/^Sender \(untrusted.*?\n```json\n[\s\S]*?```\n\n?/m, '');
+
+    var ts = m.timestamp || (m.message && m.message.timestamp);
+    html += '<div class="msg ' + cls + '">' +
+      '<div class="role">' + escapeHtml(role) + '</div>' +
+      '<div>' + escapeHtml(text) + (truncated ? '<br><em style="color:var(--muted)">[truncated]</em>' : '') + '</div>' +
+      (ts ? '<div class="ts">' + new Date(ts).toLocaleTimeString() + '</div>' : '') +
+      '</div>';
+  });
+  if (!html) html = '<div class="empty-state"><div style="color:var(--muted)">No messages yet</div></div>';
+  var wasAtBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 50;
+  container.innerHTML = html;
+  if (wasAtBottom || autoScroll) {
+    container.scrollTop = container.scrollHeight;
+    document.getElementById('scrollBadge').style.display = 'none';
+  } else if (msgs.length > lastMsgCount) {
+    document.getElementById('scrollBadge').style.display = 'block';
+  }
+  lastMsgCount = msgs.length;
+}
+
+function scrollToBottom() {
+  var c = document.getElementById('messages');
+  c.scrollTop = c.scrollHeight;
+  document.getElementById('scrollBadge').style.display = 'none';
+}
+
+document.getElementById('messages').addEventListener('scroll', function() {
+  var c = this;
+  autoScroll = c.scrollHeight - c.scrollTop - c.clientHeight < 50;
+  if (autoScroll) document.getElementById('scrollBadge').style.display = 'none';
+});
+
+loadSessions();
+setInterval(loadSessions, 10000);
+</script>
+</body>
+</html>
