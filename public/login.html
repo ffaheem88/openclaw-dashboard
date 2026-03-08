@@ -2,11 +2,12 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>🤖 Clawdbot – Sign In</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/responsive.css">
   <style>
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -218,7 +219,15 @@
       color: var(--text-muted);
       font-size: 12px;
     }
+
+    @media (max-width: 480px) {
+      .login-wrapper { padding: 16px; }
+      .login-card { padding: 28px 20px 24px; border-radius: 16px; }
+      .form-input { font-size: 16px !important; } /* prevent iOS zoom */
+    }
   </style>
+  <link rel="stylesheet" href="/design-system.css">
+  <link rel="stylesheet" href="/overrides.css">
 </head>
 <body>
   <div class="orb orb-1"></div>
@@ -263,5 +272,6 @@
       document.getElementById('errorMsg').classList.add('visible');
     }
   </script>
+  <script src="/nav.js"></script>
 </body>
 </html>

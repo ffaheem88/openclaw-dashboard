@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Alerts & Auth — OpenClaw Dashboard</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/responsive.css">
@@ -49,6 +49,8 @@
     .msg-div.error{display:block;background:rgba(244,63,94,.1);color:var(--red)}
     @media(max-width:768px){.form-row{flex-direction:column;align-items:stretch}.form-row label{min-width:auto}}
   </style>
+  <link rel="stylesheet" href="/design-system.css">
+  <link rel="stylesheet" href="/overrides.css">
 </head>
 <body>
   <div class="topbar">
@@ -248,5 +250,6 @@ loadAlertConfig();
 loadRecentAlerts();
 setInterval(loadRecentAlerts, 30000);
 </script>
+  <script src="/nav.js"></script>
 </body>
 </html>

@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>🤖 Agent Orchestration</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -27,6 +27,13 @@
             --accent-emerald: #10b981;
             --accent-amber: #f59e0b;
             --accent-gradient: linear-gradient(135deg, #06b6d4, #8b5cf6, #ec4899);
+            /* Short aliases */
+            --bg: #0a0e17; --bg2: #0f1420; --bg3: #131825;
+            --glass: rgba(255,255,255,.04); --border: rgba(255,255,255,.08);
+            --text: #f1f5f9; --text2: #94a3b8; --muted: #64748b;
+            --cyan: #06b6d4; --purple: #8b5cf6; --green: #10b981; --amber: #f59e0b; --red: #f43f5e;
+            --gradient: linear-gradient(135deg,#06b6d4,#8b5cf6,#ec4899);
+            --accent-red: #ef4444;
         }
 
         body {
@@ -926,6 +933,8 @@
         details.feed-collapsible > summary::-webkit-details-marker { display: none; }
     </style>
   <link rel="stylesheet" href="/responsive.css">
+  <link rel="stylesheet" href="/design-system.css">
+  <link rel="stylesheet" href="/overrides.css">
 </head>
 <body>
     <div class="header">
@@ -935,12 +944,15 @@
         </div>
         <button class="mobile-menu-btn" onclick="toggleMobileNav()">☰</button><div class="mobile-overlay" onclick="toggleMobileNav()"></div><div class="header-nav">
             <a href="/">📊 Dashboard</a>
-            <a href="/mail.html">📧 Mail</a>
+            <a href="/live.html">🔴 Live</a>
+            <a href="/chat.html">💬 Chat</a>
+            <a href="/analytics.html">📈 Analytics</a>
+            <a href="/agents-control.html">🎛️ Agents</a>
+            <a href="/memory.html">🧠 Memory</a>
+            <a href="/files.html">🗂️ Files</a>
+            <a href="/crons.html">⏰ Crons</a>
             <a href="/settings.html">⚙️ Settings</a>
-            <a href="neural.html">🧠 Neural</a>
-            <a href="/logs.html">📋 Logs</a>
-            <a href="/identity.html">🧠 Identity</a>
-            <a href="#" onclick="logout(event)" style="color: var(--accent-red, #ef4444);">⏏ Logout</a>
+            <a href="/logout" style="color:var(--accent-red,#ef4444)">⏏ Logout</a>
         </div>
     </div>
 
@@ -1679,5 +1691,6 @@
         }, 1000);
     function toggleMobileNav(){var n=document.querySelector(".header-nav");n.classList.toggle("open");var o=document.querySelector(".mobile-overlay");o.classList.toggle("open");o.style.display=o.classList.contains("open")?"block":"none";}
 </script>
+  <script src="/nav.js"></script>
 </body>
 </html>

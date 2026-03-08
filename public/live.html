@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Live Sessions — OpenClaw Dashboard</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/responsive.css">
@@ -58,6 +58,8 @@
     @keyframes blink{0%,100%{opacity:.2}50%{opacity:1}}
     .auto-scroll-badge{position:fixed;bottom:60px;right:24px;background:var(--cyan);color:#000;padding:6px 14px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;display:none;z-index:50}
   </style>
+  <link rel="stylesheet" href="/design-system.css">
+  <link rel="stylesheet" href="/overrides.css">
 </head>
 <body>
   <div class="topbar">
@@ -292,5 +294,6 @@ if (initialSession) {
   setTimeout(function(){ selectSession(initialSession); }, 100);
 }
 </script>
+  <script src="/nav.js"></script>
 </body>
 </html>

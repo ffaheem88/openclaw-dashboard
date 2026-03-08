@@ -2,10 +2,11 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>OpenClaw Dashboard — Setup</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/responsive.css">
   <style>
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
     :root {
@@ -155,7 +156,19 @@
     @keyframes spin { to { transform: rotate(360deg); } }
 
     .divider { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+
+    @media (max-width: 600px) {
+      body { padding: 12px; align-items: flex-start; padding-top: 24px; }
+      .wizard { border-radius: 12px; }
+      .wizard-header { padding: 24px 20px 0; }
+      .wizard-body { padding: 0 20px 24px; }
+      .feature-grid { grid-template-columns: 1fr !important; }
+      .steps { gap: 6px; padding: 16px 20px 12px; }
+      input, select, textarea { font-size: 16px !important; }
+    }
   </style>
+  <link rel="stylesheet" href="/design-system.css">
+  <link rel="stylesheet" href="/overrides.css">
 </head>
 <body>
   <div class="wizard">
@@ -688,5 +701,6 @@ validateKey('openai', 'keyOpenAI', 'statusOpenAI');
 
 autoDetect();
 </script>
+  <script src="/nav.js"></script>
 </body>
 </html>

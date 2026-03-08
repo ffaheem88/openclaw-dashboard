@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Workspace Files — OpenClaw Dashboard</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <style>
@@ -82,6 +82,8 @@
     .modified::after{content:" •";color:var(--amber)}
   </style>
   <link rel="stylesheet" href="/responsive.css">
+  <link rel="stylesheet" href="/design-system.css">
+  <link rel="stylesheet" href="/overrides.css">
 </head>
 <body>
   <div class="topbar">
@@ -389,5 +391,6 @@ if (openParam) {
 }
 function toggleMobileNav(){document.querySelector(".nav").classList.toggle("open");var o=document.querySelector(".mobile-overlay");o.classList.toggle("open");o.style.display=o.classList.contains("open")?"block":"none";}
 </script>
+  <script src="/nav.js"></script>
 </body>
 </html>

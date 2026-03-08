@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0, viewport-fit=cover">
   <title>📧 Clawdbot Mail</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -26,6 +26,13 @@
       --accent-pink: #ec4899;
       --accent-emerald: #10b981;
       --gradient-primary: linear-gradient(135deg, #06b6d4, #8b5cf6, #ec4899);
+      /* Short aliases */
+      --bg: #0a0e17; --bg2: #0f1420; --bg3: #131825;
+      --glass: rgba(255,255,255,.04); --border: rgba(255,255,255,.08);
+      --text: #f1f5f9; --text2: #94a3b8; --muted: #64748b;
+      --cyan: #06b6d4; --purple: #8b5cf6; --green: #10b981; --amber: #f59e0b; --red: #f43f5e;
+      --gradient: linear-gradient(135deg,#06b6d4,#8b5cf6,#ec4899);
+      --accent-red: #ef4444;
     }
 
     @keyframes backgroundPulse {
@@ -620,6 +627,10 @@
       font-weight: 500;
     }
 
+    .nav-links { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+    .nav-links a { color: var(--text-secondary); text-decoration: none; font-size: 13px; font-weight: 500; padding: 6px 12px; border-radius: 8px; background: var(--glass-bg); border: 1px solid var(--glass-border); transition: all .2s; }
+    .nav-links a:hover { color: var(--accent-cyan); border-color: rgba(6,182,212,.3); background: rgba(6,182,212,.1); }
+
     /* Responsive adjustments */
     @media (max-width: 768px) {
       .header {
@@ -679,21 +690,27 @@
     }
   </style>
   <link rel="stylesheet" href="/responsive.css">
+  <link rel="stylesheet" href="/design-system.css">
+  <link rel="stylesheet" href="/overrides.css">
 </head>
 <body>
   <div class="main-wrapper">
     <div class="header">
       <h1>📧 Clawdbot Mail</h1>
-      <a href="/">📊 Dashboard</a>
-      <a href="/live.html">🔴 Live</a>
+      <button class="mobile-menu-btn" onclick="toggleMobileNav()">☰</button>
+      <div class="mobile-overlay" onclick="toggleMobileNav()"></div>
+      <div class="nav-links">
+        <a href="/">📊 Dashboard</a>
+        <a href="/live.html">🔴 Live</a>
         <a href="/chat.html">💬 Chat</a>
-      <a href="/analytics.html">📈 Analytics</a>
-      <a href="/agents-control.html">🎛️ Agents</a>
-      <a href="/memory.html">🧠 Memory</a>
-      <a href="/files.html">🗂️ Files</a>
-      <a href="/crons.html">⏰ Crons</a>
-      <a href="/settings.html">⚙️ Settings</a>
-      <a href="/logout" style="color:var(--red,var(--accent-red,#ef4444))">⏏ Logout</a>
+        <a href="/analytics.html">📈 Analytics</a>
+        <a href="/agents-control.html">🎛️ Agents</a>
+        <a href="/memory.html">🧠 Memory</a>
+        <a href="/files.html">🗂️ Files</a>
+        <a href="/crons.html">⏰ Crons</a>
+        <a href="/settings.html">⚙️ Settings</a>
+        <a href="/logout" style="color:var(--accent-red,#ef4444)">⏏ Logout</a>
+      </div>
     </div>
     <div class="nav-tabs">
       <div class="nav-tab active" data-folder="INBOX" onclick="switchFolder('INBOX')">
@@ -812,6 +829,14 @@
     setInterval(function(){silentRefresh(currentFolder);}, 30000);
     // Refresh stats every 60s
     setInterval(loadMailStats, 60000);
+
+    function toggleMobileNav(){
+      var nav = document.querySelector('.nav-links');
+      if(nav) nav.classList.toggle('open');
+      var o = document.querySelector('.mobile-overlay');
+      if(o) o.classList.toggle('open');
+    }
   </script>
+  <script src="/nav.js"></script>
 </body>
 </html>

@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Memory Explorer — OpenClaw Dashboard</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/responsive.css">
@@ -61,6 +61,8 @@
     .toast.error{background:rgba(244,63,94,.9);color:#fff}
     @keyframes slideUp{from{transform:translateY(20px);opacity:0}to{transform:none;opacity:1}}
   </style>
+  <link rel="stylesheet" href="/design-system.css">
+  <link rel="stylesheet" href="/overrides.css">
 </head>
 <body>
   <div class="topbar">
@@ -263,5 +265,6 @@ function escapeHtml(text) {
 
 loadMemoryFiles();
 </script>
+  <script src="/nav.js"></script>
 </body>
 </html>

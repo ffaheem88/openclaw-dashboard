@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>🤖 Clawdbot Dashboard</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -34,6 +34,13 @@
       --gradient-card: linear-gradient(135deg, rgba(6, 182, 212, 0.1) 0%, rgba(139, 92, 246, 0.05) 100%);
       --shadow-glow: 0 0 40px rgba(6, 182, 212, 0.15);
       --shadow-card: 0 8px 32px rgba(0, 0, 0, 0.3);
+      /* Short aliases */
+      --bg: #0a0e17; --bg2: #0f1420; --bg3: #131825;
+      --glass: rgba(255,255,255,.04); --glass-hover: rgba(255,255,255,.07);
+      --border: rgba(255,255,255,.08); --border-focus: rgba(6,182,212,.3);
+      --text: #f1f5f9; --text2: #94a3b8; --muted: #64748b;
+      --cyan: #06b6d4; --purple: #8b5cf6; --green: #10b981; --amber: #f59e0b; --red: #f43f5e;
+      --gradient: linear-gradient(135deg,#06b6d4,#8b5cf6,#ec4899);
     }
 
     html {
@@ -813,6 +820,8 @@
     }
   </style>
   <link rel="stylesheet" href="/responsive.css">
+  <link rel="stylesheet" href="/design-system.css">
+  <link rel="stylesheet" href="/overrides.css">
 </head>
 <body>
   <!-- Floating Orbs -->
@@ -1620,5 +1629,6 @@
       fetch('/logout', { method: 'POST' }).then(function () { window.location = '/login'; });
     }
   </script>
+  <script src="/nav.js"></script>
 </body>
 </html>

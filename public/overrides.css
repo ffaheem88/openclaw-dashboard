@@ -1,0 +1,151 @@
+/* Override layer — neutralizes AI slop patterns across all pages
+   Applied AFTER page-specific styles to correct without rewriting */
+
+/* Kill floating orbs */
+.orb, .orb-1, .orb-2, .orb-3 { display: none !important; }
+
+/* Kill animated background gradients */
+body::before {
+  background: none !important;
+  animation: none !important;
+}
+
+/* Kill gradient text — use solid accent instead */
+.header-left h1,
+h1[style*="gradient"],
+[style*="-webkit-background-clip: text"],
+.gradient-text {
+  background: none !important;
+  -webkit-background-clip: unset !important;
+  -webkit-text-fill-color: var(--text-1, #eef0f6) !important;
+  background-clip: unset !important;
+}
+
+/* Kill pulsing icon animations */
+.header-left h1::before {
+  animation: none !important;
+  filter: none !important;
+}
+
+/* Rebrand body */
+body {
+  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif !important;
+  background: var(--surface-1, #11141d) !important;
+  color: var(--text-1, #eef0f6) !important;
+}
+
+/* Rebrand header/topbar area */
+.header, .topbar {
+  background: var(--surface-0, #0c0f16) !important;
+  border-bottom: 1px solid var(--border-1, #1f2435) !important;
+  backdrop-filter: none !important;
+}
+
+/* Rebrand nav links */
+.nav-links a, .nav-link, .topbar .nav a, .header-nav a {
+  color: var(--text-2, #9ba3b8) !important;
+  transition: color 120ms cubic-bezier(0.25,1,0.5,1), background 120ms cubic-bezier(0.25,1,0.5,1) !important;
+}
+.nav-links a:hover, .nav-link:hover, .topbar .nav a:hover, .header-nav a:hover,
+.nav-links a.active, .topbar .nav a.active {
+  color: var(--text-1, #eef0f6) !important;
+  background: var(--surface-2, #171b27) !important;
+}
+
+/* Cards — clean, no glassmorphism overkill */
+.card, .stat-card, .session-card, .metric-card, .status-card,
+.cron-card, .heartbeat-card, .agent-card, [class*="-card"] {
+  background: var(--surface-2, #171b27) !important;
+  border: 1px solid var(--border-1, #1f2435) !important;
+  backdrop-filter: none !important;
+  box-shadow: none !important;
+  border-radius: 14px !important;
+}
+.card:hover, .stat-card:hover, .session-card:hover,
+.agent-card:hover, [class*="-card"]:hover {
+  border-color: var(--border-2, #2a3047) !important;
+}
+
+/* Kill gradient borders on cards */
+.card::before, .stat-card::before, .metric-card::before {
+  display: none !important;
+}
+
+/* Accent color: amber-gold, not cyan */
+.accent, .highlight, .card-value .highlight,
+.stat-value, .metric-value {
+  color: var(--accent-text, #f5cc6a) !important;
+}
+
+/* Status colors — remap */
+.status-active, .active-status { color: var(--green, #3ebb82) !important; }
+.status-warning, .idle-status { color: var(--amber, #dba04a) !important; }
+.status-error, .error-status { color: var(--red, #e05565) !important; }
+
+/* Buttons — no gradient primaries */
+.btn-primary, .primary-btn, button.primary,
+input[type="submit"] {
+  background: var(--accent, #e0a545) !important;
+  color: var(--surface-0, #0c0f16) !important;
+  border: 1px solid var(--accent, #e0a545) !important;
+  border-radius: 8px !important;
+  background-image: none !important;
+}
+
+/* Kill glow shadows */
+[style*="glow"], .glow, .shadow-glow {
+  box-shadow: none !important;
+}
+*[class*="glow"] {
+  box-shadow: none !important;
+  text-shadow: none !important;
+}
+
+/* Proper scrollbars */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-1, #1f2435); border-radius: 4px; }
+
+/* Mobile nav sliding — works with nav.js */
+@media (max-width: 768px) {
+  .mobile-menu-btn { display: block !important; }
+
+  .nav-links, .topbar .nav, .header-nav {
+    position: fixed !important;
+    top: 0 !important; right: 0 !important;
+    width: 260px !important;
+    height: 100dvh !important;
+    background: var(--surface-2, #171b27) !important;
+    border-left: 1px solid var(--border-1, #1f2435) !important;
+    flex-direction: column !important;
+    padding: 64px 16px 16px !important;
+    gap: 4px !important;
+    z-index: 160 !important;
+    transform: translateX(100%) !important;
+    transition: transform 400ms cubic-bezier(0.25,1,0.5,1) !important;
+    overflow-y: auto !important;
+    box-shadow: -4px 0 24px rgba(0,0,0,.35) !important;
+  }
+  .nav-links.open, .topbar .nav.open, .header-nav.open {
+    transform: translateX(0) !important;
+  }
+  .nav-links a, .topbar .nav a, .header-nav a {
+    display: block !important;
+    padding: 12px 16px !important;
+    border-radius: 8px !important;
+    font-size: 14px !important;
+  }
+  .header {
+    flex-wrap: nowrap !important;
+    padding: 12px 16px !important;
+  }
+  .header-right { display: none !important; }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

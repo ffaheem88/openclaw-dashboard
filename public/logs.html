@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<meta name="viewport" content="width=device-width,initial-scale=1.0, viewport-fit=cover">
 <title>📋 Clawdbot Logs</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -25,6 +25,12 @@
   --accent-amber:#f59e0b;
   --accent-red:#ef4444;
   --gradient-main:linear-gradient(135deg,#06b6d4,#8b5cf6,#ec4899);
+  /* Short aliases */
+  --bg:#0a0e17;--bg2:#0f1420;--bg3:#131825;
+  --glass:rgba(255,255,255,.04);--border:rgba(255,255,255,.08);
+  --text:#f1f5f9;--text2:#94a3b8;--muted:#64748b;
+  --cyan:#06b6d4;--purple:#8b5cf6;--green:#10b981;--amber:#f59e0b;--red:#f43f5e;
+  --gradient:linear-gradient(135deg,#06b6d4,#8b5cf6,#ec4899);
 }
 body{
   background:var(--bg-primary);
@@ -172,6 +178,8 @@ body::before{
 }
 </style>
   <link rel="stylesheet" href="/responsive.css">
+  <link rel="stylesheet" href="/design-system.css">
+  <link rel="stylesheet" href="/overrides.css">
 </head>
 <body>
 <div class="wrapper">
@@ -403,5 +411,6 @@ loadServiceStatus();
 svcStatusTimer = setInterval(loadServiceStatus, 30000);
 function toggleMobileNav(){var n=document.querySelector(".header-nav");n.classList.toggle("open");var o=document.querySelector(".mobile-overlay");o.classList.toggle("open");o.style.display=o.classList.contains("open")?"block":"none";}
 </script>
+  <script src="/nav.js"></script>
 </body>
 </html>
