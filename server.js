@@ -41,7 +41,11 @@ const SVC_EXTRA = (process.env.SVC_EXTRA || 'searxng,ollama').split(',').map(s =
 const SESSIONS_DIR = path.join(OPENCLAW_HOME, 'agents', AGENT_NAME, 'sessions');
 const NEURAL_DB_PATH = require('path').resolve(require('os').homedir(), '.neuralmemory/brains/default.db');
 
-const AUTH_CONFIG_PATH = path.join(__dirname, 'config', 'dashboard-auth.json');
+// Config lives in user home, not inside the npm package (which may be root-owned)
+const CONFIG_DIR = process.env.OPENCLAW_DASHBOARD_CONFIG || path.join(OPENCLAW_HOME, 'dashboard', 'config');
+if (!fs.existsSync(CONFIG_DIR)) fs.mkdirSync(CONFIG_DIR, { recursive: true });
+
+const AUTH_CONFIG_PATH = path.join(CONFIG_DIR, 'dashboard-auth.json');
 function getAuthConfig() {
   try { return JSON.parse(fs.readFileSync(AUTH_CONFIG_PATH, 'utf8')); }
   catch { return { username: 'admin', passwordHash: '$2a$10$placeholder' }; }
@@ -3151,7 +3155,7 @@ app.post('/api/settings/features', express.json(), requireAuth, (req, res) => {
     writeEnvFile(env);
 
     // Update dashboard config
-    const configDir = path.join(__dirname, 'config');
+    const configDir = CONFIG_DIR;
     if (!fs.existsSync(configDir)) fs.mkdirSync(configDir, { recursive: true });
     const dashConfigPath = path.join(configDir, 'dashboard-config.json');
     let dashConfig = {};
@@ -3171,7 +3175,7 @@ app.post('/api/setup/save', express.json(), (req, res) => {
 
   try {
     // Write auth config
-    const configDir = path.join(__dirname, 'config');
+    const configDir = CONFIG_DIR;
     if (!fs.existsSync(configDir)) fs.mkdirSync(configDir, { recursive: true });
 
     const authConfig = {
@@ -3483,7 +3487,7 @@ app.post('/api/agent/steer', express.json(), requireAuth, (req, res) => {
   const { key, message } = req.body || {};
   if (!key || !message) return res.json({ error: 'Key and message required' });
   // Write steer request to a file that the agent can pick up
-  const steerDir = path.join(__dirname, 'config');
+  const steerDir = CONFIG_DIR;
   if (!fs.existsSync(steerDir)) fs.mkdirSync(steerDir, { recursive: true });
   const steerFile = path.join(steerDir, 'steer-requests.json');
   let requests = [];
@@ -3495,7 +3499,7 @@ app.post('/api/agent/steer', express.json(), requireAuth, (req, res) => {
 
 // GET/POST /api/settings/alerts — alert configuration
 app.get('/api/settings/alerts', requireAuth, (req, res) => {
-  const configPath = path.join(__dirname, 'config', 'alerts-config.json');
+  const configPath = path.join(CONFIG_DIR, 'alerts-config.json');
   try {
     const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
     res.json(config);
@@ -3504,7 +3508,7 @@ app.get('/api/settings/alerts', requireAuth, (req, res) => {
 
 app.post('/api/settings/alerts', express.json(), requireAuth, (req, res) => {
   try {
-    const configDir = path.join(__dirname, 'config');
+    const configDir = CONFIG_DIR;
     if (!fs.existsSync(configDir)) fs.mkdirSync(configDir, { recursive: true });
     fs.writeFileSync(path.join(configDir, 'alerts-config.json'), JSON.stringify(req.body, null, 2));
     res.json({ ok: true });
