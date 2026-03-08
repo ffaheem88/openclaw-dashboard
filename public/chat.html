@@ -197,8 +197,8 @@ function loadTargets(){
       {id:'ollama/llama3.2',name:'Llama 3.2 (Local)',icon:'🦙'}
     ];
     providers.forEach(function(p){
-      html+='<div class="target-item" data-type="provider" data-model="'+escapeHtml(p.id)+'" onclick="selectTarget(this)">';
-      html+='<span class="icon">'+p.icon+'</span><div class="info"><div class="name">'+escapeHtml(p.name)+'</div>';
+      html+='<div class="target-item" data-type="provider" data-model="'+escapeHtml(p.id)+'" data-testid="provider-'+escapeHtml(p.name.replace(/\s+/g,'-').toLowerCase())+'" onclick="selectTarget(this)">';
+      html+='<span class="icon">'+p.icon+'</span><div class="info"><div class="name" style="color:var(--cyan)">'+escapeHtml(p.name)+'</div>';
       html+='<div class="detail">'+escapeHtml(p.id)+'</div></div></div>';
     });
 
