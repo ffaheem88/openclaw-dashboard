@@ -265,6 +265,8 @@ function requireSetupLocalAccess(req, res, next) {
 
 // Auth middleware — protect everything except /login, /setup, and /api/auth/*
 function requireAuth(req, res, next) {
+  // Allow static assets (CSS, JS, fonts, images) through — needed for login/setup pages
+  if (/\.(css|js|ico|png|jpg|svg|woff2?|ttf|eot)$/.test(req.path)) return next();
   // Always allow login and setup pages
   if (req.path === '/login' || req.path === '/login.html') return next();
   if (req.path === '/setup' || req.path === '/setup.html') {
