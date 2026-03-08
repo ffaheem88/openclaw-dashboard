@@ -154,10 +154,12 @@ function formatContent(text){
 }
 
 function addMessage(role,content,time){
+  if(typeof content==='object'&&content!==null) content=content.text||content.message||JSON.stringify(content);
+  if(!content||String(content).trim()==='[object Object]') return;
   var messages=document.getElementById('messages');
   var div=document.createElement('div');
   div.className='msg '+role;
-  div.innerHTML=formatContent(content);
+  div.innerHTML=formatContent(String(content));
   if(time){var t=document.createElement('div');t.className='msg-time';t.textContent=time;div.appendChild(t)}
   messages.appendChild(div);
   messages.scrollTop=messages.scrollHeight;
@@ -260,11 +262,22 @@ function selectTarget(el){
             if(typeof content==='string') text=content;
             else if(Array.isArray(content)) text=content.filter(function(c){return c.type==='text'}).map(function(c){return c.text||''}).join('\n');
             else if(content&&typeof content==='object') text=content.text||'';
+            if(!text||typeof text==='object') text=typeof text==='object'?JSON.stringify(text):'';
             if(!text) return;
-            // Filter noise
-            if(text.trim()==='NO_REPLY'||text.trim()==='HEARTBEAT_OK') return;
-            if(text.includes('openclaw.inbound_meta')||text.indexOf('Conversation info (untrusted')===0) return;
-            if(text.indexOf('Sender (untrusted metadata)')===0) return;
+            // Filter noise - strip metadata lines from multi-part messages
+            var lines=text.split('\n');
+            var clean=[];var skip=false;
+            for(var li=0;li<lines.length;li++){
+              var ln=lines[li];
+              if(ln.indexOf('Conversation info (untrusted')===0||ln.indexOf('Sender (untrusted metadata)')===0||ln.indexOf('[Queued messages while')===0||ln.indexOf('To send an image back')===0||ln.indexOf('[media attached:')===0){skip=true;continue}
+              if(skip&&(ln.trim()==='```'||ln.trim()==='---'||ln.trim()==='')){if(ln.trim()==='```'){var inJson=!inJson;if(!inJson){skip=false}}continue}
+              if(skip&&(ln.trim().startsWith('"')||ln.trim().startsWith('{')||ln.trim().startsWith('}')||ln.trim()==='```json'))continue;
+              if(!skip){clean.push(ln)}
+              if(skip&&ln.trim()==='}'){skip=false}
+            }
+            text=clean.join('\n').trim();
+            if(!text||text==='NO_REPLY'||text==='HEARTBEAT_OK') return;
+            if(text.includes('"schema": "openclaw.inbound_meta')) return;
             addMessage(m.role,text);
           }
         });
