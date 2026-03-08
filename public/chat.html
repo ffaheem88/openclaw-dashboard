@@ -473,9 +473,12 @@ function sendMessage(){
       document.getElementById('typingIndicator').classList.remove('show');
       sendBtn.disabled=false;
       if(d.error){addMessage('system','Error: '+d.error);return}
-      if(d.mode==='channel'){
-        // Message sent to channel — will appear via live polling
-        toast('Message sent','success');
+      if(d.mode==='injected'){
+        // Message injected — agent response will appear via live polling
+        document.getElementById('typingIndicator').classList.add('show');
+        toast('Message injected — waiting for agent response...','success');
+        // Keep polling, response will appear automatically
+        setTimeout(function(){document.getElementById('typingIndicator').classList.remove('show')},30000);
       } else {
         var resp=d.response||'';
         if(resp) addMessage('system',resp);
