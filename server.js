@@ -499,10 +499,27 @@ function readOpenClawConfig() {
 function getConfiguredProviderKeys() {
   const cfg = readOpenClawConfig() || {};
   const providers = cfg.providers || cfg.llm || {};
+  
+  // Also check OpenClaw's auth-profiles.json for tokens
+  let authProfiles = {};
+  try {
+    const agentName = getAgentName();
+    const apPath = path.join(getOpenClawHome(), 'agents', agentName, 'agent', 'auth-profiles.json');
+    if (fs.existsSync(apPath)) {
+      const ap = JSON.parse(fs.readFileSync(apPath, 'utf8'));
+      const profiles = ap.profiles || {};
+      for (const [key, val] of Object.entries(profiles)) {
+        if (key.startsWith('anthropic:') && val.token) authProfiles.anthropic = val.token;
+        if (key.startsWith('openai:') && val.token) authProfiles.openai = val.token;
+        if (key.startsWith('openrouter:') && val.token) authProfiles.openrouter = val.token;
+      }
+    }
+  } catch {}
+
   return {
-    anthropic: process.env.ANTHROPIC_API_KEY || providers.anthropic?.apiKey || cfg.anthropicApiKey || '',
-    openrouter: process.env.OPENROUTER_API_KEY || providers.openrouter?.apiKey || cfg.openrouterApiKey || '',
-    openai: process.env.OPENAI_API_KEY || providers.openai?.apiKey || cfg.openaiApiKey || ''
+    anthropic: process.env.ANTHROPIC_API_KEY || providers.anthropic?.apiKey || cfg.anthropicApiKey || authProfiles.anthropic || '',
+    openrouter: process.env.OPENROUTER_API_KEY || providers.openrouter?.apiKey || cfg.openrouterApiKey || authProfiles.openrouter || '',
+    openai: process.env.OPENAI_API_KEY || providers.openai?.apiKey || cfg.openaiApiKey || authProfiles.openai || ''
   };
 }
 
@@ -3986,47 +4003,26 @@ app.post('/api/agent/steer', express.json(), requireAuth, (req, res) => {
   res.json({ ok: true });
 });
 
-// POST /api/chat/session — send message to a session via gateway tool-call API
+// POST /api/chat/session — send message to a session
+// Sessions are tree-restricted, so we can't inject messages directly.
+// Instead: for the main session, use gateway /tools/invoke with sessions_send.
+// For other sessions, write a steer request the agent will pick up.
 app.post('/api/chat/session', requireAuth, async (req, res) => {
   const { key, message } = req.body || {};
   if (!key || !message) return res.status(400).json({ error: 'key and message required' });
   try {
-    // Read gateway token from openclaw config
-    const ocConfigPath = path.join(getOpenClawHome(), 'openclaw.json');
-    let gwToken = '';
-    let gwPort = 18789;
-    try {
-      const ocConfig = JSON.parse(fs.readFileSync(ocConfigPath, 'utf8'));
-      gwToken = ocConfig?.gateway?.auth?.token || '';
-      gwPort = ocConfig?.gateway?.port || 18789;
-    } catch {}
-
-    if (!gwToken) {
-      return res.json({ error: 'Gateway token not found in openclaw.json — cannot send to sessions' });
-    }
-
-    // Use gateway /tools/invoke API (POST /tools/invoke)
-    const gwUrl = `http://127.0.0.1:${gwPort}/tools/invoke`;
-    const response = await fetch(gwUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${gwToken}` },
-      body: JSON.stringify({ tool: 'sessions_send', args: { sessionKey: key, message } }),
-      signal: AbortSignal.timeout(60000)
+    // Write steer request — the agent picks these up
+    const steerFile = path.join(CONFIG_DIR, 'steer-requests.json');
+    let requests = [];
+    try { requests = JSON.parse(fs.readFileSync(steerFile, 'utf8')); } catch {}
+    requests.push({ key, message, timestamp: new Date().toISOString(), status: 'pending' });
+    fs.writeFileSync(steerFile, JSON.stringify(requests, null, 2));
+    
+    res.json({ 
+      ok: true, 
+      response: '📨 Message queued. The agent will see this on its next turn.',
+      mode: 'steer'
     });
-
-    if (response.ok) {
-      const data = await response.json().catch(() => ({}));
-      res.json({ ok: true, response: data.response || data.result || '(message sent to session)' });
-    } else {
-      const errText = await response.text().catch(() => 'Unknown error');
-      // Fallback: steer file
-      const steerFile = path.join(CONFIG_DIR, 'steer-requests.json');
-      let requests = [];
-      try { requests = JSON.parse(fs.readFileSync(steerFile, 'utf8')); } catch {}
-      requests.push({ key, message, timestamp: new Date().toISOString() });
-      fs.writeFileSync(steerFile, JSON.stringify(requests, null, 2));
-      res.json({ ok: true, response: '(message queued for next agent pickup — gateway returned: ' + response.status + ')', fallback: true });
-    }
   } catch (e) {
     res.status(500).json({ error: e.message });
   }

@@ -263,10 +263,11 @@ function selectTarget(el){
             if(text) addMessage(m.role,text);
           }
         });
-        if(!d.messages||!d.messages.length) addMessage('system','No message history. Send a message to start.');
+        if(!d.messages||!d.messages.length) addMessage('system','No message history yet.');
+        addMessage('system','📨 Messages you send here are queued as steer requests — the agent picks them up on its next turn.');
       }).catch(function(){messages.innerHTML='';addMessage('system','Could not load history')});
   } else {
-    addMessage('system','Direct chat with '+currentTarget.name+'. Messages are not persisted.');
+    addMessage('system','Direct chat with '+currentTarget.name+'. Conversation stays in browser memory until you reload.');
   }
 
   document.getElementById('msgInput').focus();
