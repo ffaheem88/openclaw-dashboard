@@ -169,6 +169,8 @@ function loadTargets(){
     var list=document.getElementById('targetList');
     var html='<div class="separator">Active Sessions</div>';
     
+    // Filter out cron run entries (keep parent cron only) and deduplicate
+    sessions=sessions.filter(function(s){return !s.key.includes(':run:')});
     sessions.forEach(function(s){
       var age=s.updatedAtMs?Math.floor((Date.now()-s.updatedAtMs)/60000):(s.updatedAt?Math.floor((Date.now()-new Date(s.updatedAt).getTime())/60000):99999);
       var dotCls=age<2?'dot-active':age<10?'dot-idle':'dot-off';
@@ -252,8 +254,12 @@ function selectTarget(el){
         messages.innerHTML='';
         (d.messages||[]).forEach(function(m){
           if(m.role==='user'||m.role==='assistant'){
-            var text=m.content;
-            if(Array.isArray(text)) text=text.filter(function(c){return c.type==='text'}).map(function(c){return c.text}).join('\n');
+            // Content can be at m.message.content (JSONL format) or m.content
+            var content=m.message?m.message.content:m.content;
+            var text='';
+            if(typeof content==='string') text=content;
+            else if(Array.isArray(content)) text=content.filter(function(c){return c.type==='text'}).map(function(c){return c.text||''}).join('\n');
+            else if(content&&typeof content==='object') text=content.text||JSON.stringify(content);
             if(text) addMessage(m.role,text);
           }
         });
