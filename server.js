@@ -2189,44 +2189,37 @@ app.get('/api/status/heartbeat', (req, res) => {
   const hit = cache.get('heartbeat');
   if (hit) return res.json(hit);
   try {
-    // Get main session status
-    const sessionsRaw = exec("openclaw sessions 2>/dev/null", '');
+    // Read sessions.json directly (reliable from systemd, unlike CLI)
+    const sjPath = path.join(getSessionsDir(), 'sessions.json');
+    let sessIndex = {};
+    try { sessIndex = JSON.parse(fs.readFileSync(sjPath, 'utf8')); } catch {}
+    
     let mainSessionStatus = { status: 'unknown', lastActivity: null, description: 'Unknown' };
     
-    for (const line of sessionsRaw.split('\n')) {
-      if (line.includes('agent:main:main') || line.includes('agent:voice:main')) {
-        const match = line.match(/^(\S+)\s+(agent:(?:main|voice):main)\s+(.+?(?:ago|now))\s+(\S+)\s+(.*)/);
-        if (match) {
-          const [, , , age, model] = match;
-          const ageMatch = age.trim().match(/(\d+)([mhd])\s*ago/);
-          let ageMs = 0;
-          if (ageMatch) {
-            const n = parseInt(ageMatch[1]);
-            if (ageMatch[2] === 'm') ageMs = n * 60000;
-            else if (ageMatch[2] === 'h') ageMs = n * 3600000;
-            else if (ageMatch[2] === 'd') ageMs = n * 86400000;
-          }
-          
-          if (ageMs < 60000) { // Active within 1 minute
-            mainSessionStatus = {
-              status: 'active',
-              lastActivity: new Date(Date.now() - ageMs).toISOString(),
-              description: 'Processing request',
-              ageMs,
-              model
-            };
-          } else {
-            const now = new Date(Date.now() - ageMs);
-            mainSessionStatus = {
-              status: 'idle',
-              lastActivity: now.toISOString(),
-              description: `💤 Idle since ${now.toTimeString().split(' ')[0]} UTC`,
-              ageMs,
-              model
-            };
-          }
-        }
-        break;
+    // Find main session
+    const mainKey = Object.keys(sessIndex).find(k => k === 'agent:voice:main' || k === 'agent:main:main');
+    if (mainKey) {
+      const entry = sessIndex[mainKey];
+      const updatedAt = entry.updatedAt;
+      const ageMs = updatedAt ? Date.now() - updatedAt : Infinity;
+      const model = entry.model || entry.modelProvider || 'unknown';
+      const lastActivity = updatedAt ? new Date(updatedAt).toISOString() : null;
+      
+      if (ageMs < 120000) {
+        mainSessionStatus = { status: 'active', lastActivity, description: 'Processing request', ageMs, model };
+      } else {
+        const idleTime = updatedAt ? new Date(updatedAt).toTimeString().split(' ')[0] : 'unknown';
+        mainSessionStatus = { status: 'idle', lastActivity, description: `💤 Idle since ${idleTime} UTC`, ageMs, model };
+      }
+    }
+    
+    // Find most recent session across ALL sessions
+    let mostRecentKey = null;
+    let mostRecentTime = 0;
+    for (const [key, val] of Object.entries(sessIndex)) {
+      if (val.updatedAt && val.updatedAt > mostRecentTime) {
+        mostRecentTime = val.updatedAt;
+        mostRecentKey = key;
       }
     }
     
@@ -2269,14 +2262,11 @@ app.get('/api/status/heartbeat', (req, res) => {
       }
     }
     
-    // Count active subagents
+    // Count active subagents from sessions.json
     let activeSubagents = 0;
-    let subagentLabels = [];
-    for (const line of sessionsRaw.split('\n')) {
-      if (line.includes('subag') && (line.includes('just now') || line.match(/\b[0-2]s\s+ago/))) {
+    for (const [key, val] of Object.entries(sessIndex)) {
+      if (key.includes(':subagent:') && val.updatedAt && (Date.now() - val.updatedAt) < 120000) {
         activeSubagents++;
-        const labelMatch = line.match(/agent:\S+/);
-        if (labelMatch) subagentLabels.push(labelMatch[0]);
       }
     }
 
@@ -2285,10 +2275,26 @@ app.get('/api/status/heartbeat', (req, res) => {
       mainSessionStatus.description = `Processing with ${activeSubagents} active sub-agent${activeSubagents > 1 ? 's' : ''}`;
     }
 
+    // Most recent activity across all sessions
+    if (mostRecentKey && mostRecentTime) {
+      const recentAgeMs = Date.now() - mostRecentTime;
+      if (recentAgeMs < 60000) {
+        if (mostRecentKey.includes('whatsapp')) systemActivity = '📱 Processing WhatsApp activity';
+        else if (mostRecentKey.includes('cron:')) systemActivity = '⏰ Cron job activity';
+        else if (mostRecentKey.includes('subagent:')) systemActivity = '🤖 Sub-agent activity';
+        else systemActivity = '⚡ Recent system activity';
+      } else {
+        systemActivity = `Last activity: ${Math.floor(recentAgeMs / 60000)}m ago`;
+      }
+    }
+
     const result = {
       mainSession: mainSessionStatus,
       systemActivity,
       activeSubagents,
+      activeSessions: Object.keys(sessIndex).length,
+      mostRecentSession: mostRecentKey,
+      mostRecentAt: mostRecentTime ? new Date(mostRecentTime).toISOString() : null,
       recentJournal: recentJournalActivity,
       timestamp: new Date().toISOString()
     };
